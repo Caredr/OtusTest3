@@ -1,0 +1,9 @@
+[submodule "C-Sharp-Basic"]
+	path = C-Sharp-Basic
+	url = https://github.com/OTUS-NET/C-Sharp-Basic.git
+[submodule "Libraries/OTUS-Homeworks"]
+	path = Libraries/OTUS-Homeworks
+	url = https://github.com/OTUS-NET/C-Sharp-Basic.git
+[submodule "Libraries/C-Sharp-Basic"]
+	path = Libraries/C-Sharp-Basic
+	url = https://github.com/OTUS-NET/C-Sharp-Basic.git
