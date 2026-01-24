@@ -14,6 +14,10 @@ namespace OtusTest3
             _toDoService = toDoService;
         }
 
+        public UpdateHandler()
+        {
+        }
+
         private ToDoService toDoService = new();
         private ToDoUser botUser = new();
         private List<ToDoItem> cardsNamesList = [];
