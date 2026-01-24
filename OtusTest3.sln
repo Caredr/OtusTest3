@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36603.0 d17.14
+VisualStudioVersion = 17.14.36603.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OtusTest3", "OtusTest3\OtusTest3.csproj", "{D6C91818-FB69-4CBF-A2E7-3F3BAF6B858F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Otus.ToDoList.ConsoleBot", "..\C-Sharp-Basic\Homeworks\05.2 ООП интерфейсы\Otus.ToDoList.ConsoleBot\Otus.ToDoList.ConsoleBot.csproj", "{BC09A634-4249-4D43-BE5A-D3EF48F0D03B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{D6C91818-FB69-4CBF-A2E7-3F3BAF6B858F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D6C91818-FB69-4CBF-A2E7-3F3BAF6B858F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D6C91818-FB69-4CBF-A2E7-3F3BAF6B858F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BC09A634-4249-4D43-BE5A-D3EF48F0D03B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC09A634-4249-4D43-BE5A-D3EF48F0D03B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC09A634-4249-4D43-BE5A-D3EF48F0D03B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC09A634-4249-4D43-BE5A-D3EF48F0D03B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
