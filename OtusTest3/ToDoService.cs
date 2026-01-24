@@ -8,65 +8,86 @@ using System.Threading.Tasks;
 
 namespace OtusTest3
 {
-    internal class ToDoService: IToDoService
+    internal class ToDoService : IToDoService
     {
         private IUserService _userService;
-        public ToDoService(IUserService userService, IToDoService toDoService)
+        private ITelegramBotClient _telegramBotClient;
+
+        public readonly int TaskCountLimit = 100;
+        public readonly int TaskLengthLimitMax = 100;
+        public readonly int TaskLengthLimitMin = 3;
+        private readonly List<ToDoItem> _tasks = [];
+
+        public ToDoItem Add(ToDoUser botUser, string name)
         {
-            _userService = userService;
-        }
-        public ToDoService()
-        {
+            int spaceChecker = name.IndexOf(' ');
+            string taskName;
+            if (spaceChecker > -1 && spaceChecker < name.Length - 1)
+            //Если есть пробел и пробел не послений символ
+            {
+                taskName = name[spaceChecker++..];
+                if (taskName.Length > TaskLengthLimitMax) throw new TaskLengthLimitException(taskName.Length, TaskLengthLimitMax);
+                //Берется подстрока от символа послепробела и до конца строки.
+                ParseAndValidateInt(taskName, TaskLengthLimitMin, TaskLengthLimitMax);
+                ToDoItem newTask = new(botUser, taskName);
+                foreach (var task in _tasks)
+                {
+                    if (task.Name == taskName)
+                    {
+                        throw new DuplicateTaskException(taskName);
+                    }
+                }
+                _tasks.Add(newTask);
+                if (_tasks.Count > TaskCountLimit) throw new TaskCountLimitException(TaskCountLimit);
+                return newTask;
+            }
+            else
+            {
+                throw new NullReferenceException();
+            }
         }
         public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
         {
-            var tasks = new List<ToDoItem>();
-            foreach(var task in tasks)
+            foreach(var task in _tasks)
             {
                 if(task.Id == userId)
                 {
-                    tasks.Add(task);
+                    _tasks.Add(task);
                 }
             }
-            return tasks;
+            return _tasks;
         }
         public IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId)
         {
-            var tasks = new List<ToDoItem>();
-            foreach (var task in tasks)
+            foreach (var task in _tasks)
             {
                 if (task.Id == userId && task.State == ToDoItemState.Active)
                 {
-                    tasks.Add(task);
+                    _tasks.Add(task);
                 }
             }
-            return tasks;
-        }
-        public ToDoItem Add(ToDoUser user, string name)
-        {
-            ToDoItem task = new(user, name);
-            return task;
+            return _tasks;
         }
         public void MarkCompleted(Guid id)
         {
-            var tasks = new List<ToDoItem>();
-            foreach (var task in tasks)
+            foreach (var task in _tasks)
             {
                 if (task.Id == id)
                 {
                     task.State = ToDoItemState.Completed;
                 }
+                else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
             }
         }
         public void Delete(Guid id)
         {
-            var tasks = new List<ToDoItem>();
-            foreach (var task in tasks)
+            foreach (var task in _tasks)
             {
                 if (task.Id == id)
                 {
-                    tasks.Remove(task);
+                    _tasks.Remove(task);
                 }
+                else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
             }
         }
         public void StartPanel(ITelegramBotClient botClient, Update update)
@@ -77,9 +98,10 @@ namespace OtusTest3
                 _userService.RegisterUser(update.Message.From.Id, update.Message.From.Username);
             }
         }
-        public void HelpPanel(string userName)
+        public void HelpPanel(ITelegramBotClient botClient, Update update)
         {
-            Console.WriteLine(" " + userName + " чтобы пользоваться программой" +
+                _telegramBotClient.SendMessage(update.Message.Chat, " " 
+                    + update.Message.From.Username + " чтобы пользоваться программой" +
                 "\n пожалуйста вводите комманды /start, /help, /info, /exit" +
                 "\n /start - задает или меняет ваше имя" +
                 "\n /help - доска информации" +
@@ -91,150 +113,14 @@ namespace OtusTest3
                 "\n /completetask - поставить статус карте - Completed" +
                 "\n /exit - выход из программы");
         }
-        public void InfoPanel(string userName)
+        public void InfoPanel(Update update)
         {
-            Console.WriteLine(userName + "версия программы - 0.0.4, дата создания 18.11.2025б " +
-                "редактура от 19.01.2026");
+            _telegramBotClient.SendMessage(update.Message.Chat, update.Message.From.Username + 
+                "версия программы - 0.0.7, дата создания 18.11.2025б " + "редактура от 27.01.2026");
         }
-        public void CompleteTaskPanel(string commandEater, List<ToDoItem> cardsNames)
+        public bool ExitPanel(out bool appState, Update update)
         {
-            int spaceChecker = commandEater.IndexOf(' ');
-            if (spaceChecker > -1 && spaceChecker < commandEater.Length - 1)
-            {
-                string cardId = commandEater[spaceChecker++..];
-                Guid findedCardId = new Guid(cardId);
-                if (cardsNames.Count > 0)
-                {
-                    foreach (var card in cardsNames)
-                    {
-                        if (card.Id == findedCardId)
-                            MarkCompleted(findedCardId);
-                        else
-                            Console.WriteLine("Нет такой карты c таким Id");
-                    }
-                }
-                else
-                    Console.WriteLine("Список пуст");
-            }
-            else
-                Console.WriteLine("Ошибка");
-        }
-        public void AddCardPanel(ToDoUser botUser, List<ToDoItem> cardsNames,
-            int taskCounts, int taskCountLimitMax, int taskCountLimitMin, string commandEater)
-        {
-            int spaceChecker = commandEater.IndexOf(' ');
-            if (spaceChecker > -1 && spaceChecker < commandEater.Length - 1)
-            //Если есть пробел и пробел не послений символ
-            {
-                string cardName = commandEater[spaceChecker++..];
-                    //Берется подстрока от символа послепробела и до конца строки.
-                bool check = true;
-                while (check)
-                {
-                    if (cardName == "Ошибка1111")
-                    {
-                        Console.WriteLine($"Ошибка, введите название карты");
-                        continue;
-                    }
-                    check = false;
-                    ToDoItem newCard = new(botUser, cardName);
-                    Console.WriteLine($"Карта {cardName} добавленна");
-                    foreach (var card in cardsNames)
-                    {
-                        if (card.Name == cardName)
-                        {
-                            Console.WriteLine("такое название уже существует");
-                            throw new DuplicateTaskException(cardName);
-                        }
-                    }
-                    cardsNames.Add(newCard);
-
-                }
-                if (cardsNames.Count > taskCounts)
-                {
-                    throw new TaskCountLimitException(taskCounts);
-                }
-                if (cardName.Length > taskCountLimitMax)
-                {
-                    throw new TaskLengthLimitException(cardName.Length, taskCountLimitMax);
-                }
-                ParseAndValidateInt(cardName, taskCountLimitMin, taskCountLimitMax);
-            }
-            else
-                Console.WriteLine("Ошибка");
-        }
-        public void ShowCardPanel(List<ToDoItem> cardsNames)
-        {
-            if (cardsNames.Count > 0)
-            {
-                int cardIndex = 1;
-                foreach (ToDoItem card in cardsNames)
-                {
-                    if (card.State == ToDoItemState.Active)
-                    {
-                        Console.WriteLine($"{cardIndex} {card.Name} {card.CreatedAt} {card.Id}");
-                        cardIndex++;
-                    }
-                }
-            }
-            else Console.WriteLine("Список пуст");
-        }
-        public void ShowAllCardsPanel(List<ToDoItem> cardsNames)
-        {
-            if (cardsNames.Count > 0)
-            {
-                int cardIndex = 1;
-                foreach (ToDoItem card in cardsNames)
-                {
-                    Console.WriteLine($"{cardIndex}{card.State}{card.Name} {card.CreatedAt} {card.Id}");
-                    cardIndex++;
-                }
-            }
-            else Console.WriteLine("Список пуст");
-        }
-        public void RemoveCardPanel(List<ToDoItem> cardsNames, string commandEater)
-        {
-            int spaceChecker = commandEater.IndexOf(' ');
-            if (spaceChecker > -1 && spaceChecker < commandEater.Length - 1)
-            {
-                string cardNameToDelete = commandEater[spaceChecker++..];
-                bool check = true;
-                if (cardsNames.Count > 0)
-                {
-                    while (check)
-                    {
-                        if (cardNameToDelete == "/back")
-                        {
-                            Console.WriteLine("вы вышли из меню удаления");
-                            check = false;
-                        }
-                        else
-                        {
-                            TestTo(cardNameToDelete);
-                            if (int.TryParse(cardNameToDelete, out int deletedCardNumber))
-                            {
-                                Console.WriteLine($"карта {cardsNames[deletedCardNumber - 1]} Удалена");
-                                cardsNames.RemoveAt(deletedCardNumber - 1);
-                                check = false;
-                            }
-                            else
-                            {
-                                Console.WriteLine("Введите номер из списка");
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("Список пуст");
-                }
-            }
-            else
-              Console.WriteLine("Ошибка");
-        }
-        public bool ExitPanel(out bool appState, string userName)
-        {
-            Console.WriteLine(userName + " Нажмите любую кнопку, чтобы выйти");
+            Console.WriteLine(update.Message.From.Username + " Нажмите любую кнопку, чтобы выйти");
             appState = false;
             return appState;
         }
@@ -242,8 +128,14 @@ namespace OtusTest3
         {
             Console.WriteLine("Введите максимальное количество задач"); //1
             string tasksCountstext = Console.ReadLine() ?? "Ошибка";   //2
-           // taskCounts = toDoService.TasksLimit(tasksCountstext);
+            TasksLimit(tasksCountstext);
 
+        }
+        private static void ParseAndValidateInt(string? str, int min, int max)
+        {
+            str = ValidateString(str);
+            int taskTextLenght = Translator(str);
+            Validate(taskTextLenght, min, max);
         }
         #region CustomThrows
         public int TasksLimit(string limit)
@@ -262,12 +154,6 @@ namespace OtusTest3
                 throw new ArgumentException("Нельзя превратить текст в число");
             }
             return taskTextLenght;
-        }
-        private static void ParseAndValidateInt(string? str, int min, int max)
-        {
-            str = ValidateString(str);
-            int taskTextLenght = Translator(str);
-            Validate(taskTextLenght, min, max);
         }
         private static string ValidateString(string stringToTest)
         {
@@ -288,10 +174,6 @@ namespace OtusTest3
         {
             int taskTextLenght = stringToTest.Length;
             return taskTextLenght;
-        }
-        void IToDoService.Delete(Guid id)
-        {
-            Delete(id);
         }
         #endregion
     }

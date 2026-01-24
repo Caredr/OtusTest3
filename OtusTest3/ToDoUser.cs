@@ -8,7 +8,6 @@ namespace OtusTest3
 {
     internal class ToDoUser
     {
-
             public ToDoUser()
             {
                 UserId = Guid.NewGuid();
@@ -20,7 +19,5 @@ namespace OtusTest3
             public string TelegramUserName { get; set; }
             public DateTime RegisteredAt { get; private set; }
             public long TelegramUserId { get; set; }
-
-
     }
 }

@@ -9,10 +9,9 @@ namespace OtusTest3
 {
     internal class UserService: IUserService
     {
+        private readonly List<ToDoUser> _toDoUserList = [];
         public ToDoUser? GetUser(long telegramUserId)
         {
-            Update update = new();
-            telegramUserId = update.Message.From.Id;
             var userСurrent = new ToDoUser();
             {
                 userСurrent.TelegramUserId = telegramUserId;
@@ -22,10 +21,6 @@ namespace OtusTest3
         public ToDoUser RegisterUser(long telegramUserId, string telegramUserName)
         {
             ArgumentNullException.ThrowIfNull(telegramUserName, nameof(telegramUserName));
-
-            Update update = new();
-            telegramUserId = update.Message.From.Id;
-            telegramUserName = update.Message.From.Username;
             var userСurrent = new ToDoUser();
             {
                 userСurrent.TelegramUserId = telegramUserId;
