@@ -6,7 +6,5 @@ using System.Threading.Tasks;
 
 namespace OtusTest3
 {
-    public class TaskLengthLimitException(int taskLength, int taskLengthLimit) : Exception($"Превышенно максимальная длина карты {taskLength}, лимит {taskLengthLimit}")
-    {
-    }
+    public class TaskLengthLimitException(int taskLength, int taskLengthLimit) : Exception($"Превышенно максимальная длина карты {taskLength}, лимит {taskLengthLimit}");
 }

@@ -1,18 +1,19 @@
 ﻿
+using Otus.ToDoList.ConsoleBot;
+
 namespace OtusTest3
 {
-
- 
     internal class Program
     {
         private static void Main(string[] args)
         {
             ArgumentNullException.ThrowIfNull(args);
-            UpdateHandler myapp = new();
             //Задаю макс кол-во задач, считываю, идет преобразование.
             try
             {
-                
+                UpdateHandler updateHandler = new();
+                ConsoleBotClient botClient = new();
+                botClient.StartReceiving(updateHandler);
             }
             // Когда статический конструктор класса падает с ошибкой
             catch (TypeInitializationException ex)

@@ -6,7 +6,5 @@ using System.Threading.Tasks;
 
 namespace OtusTest3
 {
-    public class DuplicateTaskException(string task) : Exception($"Такая {task} уже существует")
-    {
-    }
+    public class DuplicateTaskException(string task) : Exception($"Такая {task} уже существует");
 }

@@ -1,35 +1,25 @@
 ﻿using Otus.ToDoList.ConsoleBot;
 using Otus.ToDoList.ConsoleBot.Types;
+using System.Threading.Tasks;
 
 namespace OtusTest3
 {
     internal class UpdateHandler : IUpdateHandler
     {
         private IUserService _userService;
-        private IToDoService _toDoService;
-        private ITelegramBotClient _telegramBotClient;
-        public UpdateHandler(IUserService userService, IToDoService toDoService)
+
+        public UpdateHandler(IUserService userService)
         {
             _userService = userService;
-            _toDoService = toDoService;
-        }
-
-        public UpdateHandler()
-        {
         }
 
         private ToDoService toDoService = new();
         private ToDoUser botUser = new();
-        private List<ToDoItem> cardsNamesList = [];
-        private string commandEater = "";
-        private int taskCounts = 0;
-        private int taskCountLimitMin = 3;
-        private int taskCountLimitMax = 100;
-        private string userName = "Пользователь";
         private bool commandAccess = false;
-
         public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
         {
+            Guid taskId;
+            string commandEater = "";
             _telegramBotClient.SendMessage(update.Message.Chat,"Доступные команды /start, " +
                "/help, /info, /addtask, /showtasks, /removetask,/completetask,/showalltasks, /exit");
             bool isRun = true;
@@ -39,32 +29,41 @@ namespace OtusTest3
                 switch (commandEater)
                 {
                     case "/start":
-                        toDoService.StartPanel(_telegramBotClient, update);
+                        _toDoService.StartPanel(_telegramBotClient, update);
                         commandAccess = true;
                         break;
                     case "/help":
-                        toDoService.HelpPanel(userName);
+                        _toDoService.HelpPanel(_telegramBotClient, update);
                         break;
                     case "/info":
-                        toDoService.InfoPanel(userName);
+                        _toDoService.InfoPanel(update);
                         break;
-                    case "/addtask" when commandAccess == true:
-                        toDoService.AddCardPanel(botUser,cardsNamesList,taskCounts,taskCountLimitMax,taskCountLimitMin, commandEater);
+                    case string s when s.StartsWith("/addtask") && commandAccess == true:
+                        _toDoService.Add(botUser, commandEater);
                         break;
                     case "/showtasks" when commandAccess == true:
-                        toDoService.ShowCardPanel(cardsNamesList);
+                        _toDoService.GetAllByUserId(botUser.UserId);
                         break;
                     case "/showalltasks" when commandAccess == true:
-                        toDoService.ShowAllCardsPanel(cardsNamesList);
+                        _toDoService.GetActiveByUserId(botUser.UserId);
                         break;
-                    case "/removetask" when commandAccess == true:
-                        toDoService.RemoveCardPanel(cardsNamesList, commandEater);
+                    case string s when s.StartsWith("/removetask") && commandAccess == true:
+                        if (Guid.TryParse(commandEater, out taskId))
+                        {
+                            _toDoService.Delete(taskId);
+                            botClient.SendMessage(update.Message.Chat, "Задача удалена");
+                        }
+                        else botClient.SendMessage(update.Message.Chat, "Некорректный идентификатор задачи");
                         break;
                     case string si when si.StartsWith("/completetask") && commandAccess == true:
-                        toDoService.CompleteTaskPanel(commandEater, cardsNamesList);
+                        if (Guid.TryParse(commandEater, out taskId))
+                        {
+                            _toDoService.MarkCompleted(taskId);
+                            botClient.SendMessage(update.Message.Chat, "Задача завершена");
+                        }
                         break;
                     case "/exit":
-                        isRun = toDoService.ExitPanel(out isRun, userName);
+                        isRun = _toDoService.ExitPanel(out isRun, update);
                         break;
                     default:
                         _telegramBotClient.SendMessage(update.Message.Chat, "Ошибка, введите доступную команду");
