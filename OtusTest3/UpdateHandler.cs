@@ -13,12 +13,7 @@ namespace OtusTest3
             _userService = userService;
         }
 
-        public UpdateHandler()
-        {
-        }
-
-        private ITelegramBotClient _telegramBotClient;
-        private ToDoService _toDoService;
+        private ToDoService toDoService = new();
         private ToDoUser botUser = new();
         private bool commandAccess = false;
         public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
