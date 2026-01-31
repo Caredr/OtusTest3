@@ -7,25 +7,25 @@ namespace OtusTest3
     internal class UpdateHandler : IUpdateHandler
     {
         private IUserService _userService;
-
-        public UpdateHandler(IUserService userService)
+        private ToDoService _toDoService;
+        public UpdateHandler(IUserService userService, ToDoService toDoService)
         {
             _userService = userService;
+            _toDoService = toDoService;
         }
-
-        private ToDoService toDoService = new();
-        private ToDoUser botUser = new();
+        private ITelegramBotClient _telegramBotClient;
+        
         private bool commandAccess = false;
         public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
         {
             Guid taskId;
-            string commandEater = "";
+            ToDoUser? toDoUser = _userService.GetUser(update.Message.From.Id);
             _telegramBotClient.SendMessage(update.Message.Chat,"Доступные команды /start, " +
                "/help, /info, /addtask, /showtasks, /removetask,/completetask,/showalltasks, /exit");
             bool isRun = true;
             while (isRun)
             {
-                commandEater = Console.ReadLine() ?? "";
+                string commandEater = Console.ReadLine() ?? "";
                 switch (commandEater)
                 {
                     case "/start":
@@ -33,19 +33,19 @@ namespace OtusTest3
                         commandAccess = true;
                         break;
                     case "/help":
-                        _toDoService.HelpPanel(_telegramBotClient, update);
+                        HelpPanel(_telegramBotClient, update);
                         break;
                     case "/info":
-                        _toDoService.InfoPanel(update);
+                        InfoPanel(update);
                         break;
                     case string s when s.StartsWith("/addtask") && commandAccess == true:
-                        _toDoService.Add(botUser, commandEater);
+                        _toDoService.Add(toDoUser, commandEater);
                         break;
                     case "/showtasks" when commandAccess == true:
-                        _toDoService.GetAllByUserId(botUser.UserId);
+                        _toDoService.GetAllByUserId(toDoUser.UserId);
                         break;
                     case "/showalltasks" when commandAccess == true:
-                        _toDoService.GetActiveByUserId(botUser.UserId);
+                        _toDoService.GetActiveByUserId(toDoUser.UserId);
                         break;
                     case string s when s.StartsWith("/removetask") && commandAccess == true:
                         if (Guid.TryParse(commandEater, out taskId))
@@ -70,6 +70,27 @@ namespace OtusTest3
                         break;
                 }
             }
+        }
+
+        public void HelpPanel(ITelegramBotClient botClient, Update update)
+        {
+            _telegramBotClient.SendMessage(update.Message.Chat, " "
+                + update.Message.From.Username + " чтобы пользоваться программой" +
+            "\n пожалуйста вводите комманды /start, /help, /info, /exit" +
+            "\n /start - задает или меняет ваше имя" +
+            "\n /help - доска информации" +
+            "\n /info - дата создания программы" +
+            "\n /addtask - добавить карту" +
+            "\n /showtasks - показать список карт со статусом Active" +
+            "\n /showalltasks - показать список всех карт" +
+            "\n /removetask - убрать карту" +
+            "\n /completetask - поставить статус карте - Completed" +
+            "\n /exit - выход из программы");
+        }
+        public void InfoPanel(Update update)
+        {
+            _telegramBotClient.SendMessage(update.Message.Chat, update.Message.From.Username +
+                "версия программы - 0.0.7, дата создания 18.11.2025б " + "редактура от 27.01.2026");
         }
     }
 }
