@@ -11,13 +11,10 @@ namespace OtusTest3
     internal class ToDoService : IToDoService
     {
         private IUserService _userService;
-        private ITelegramBotClient _telegramBotClient;
-
         public readonly int TaskCountLimit = 100;
         public readonly int TaskLengthLimitMax = 100;
         public readonly int TaskLengthLimitMin = 3;
         private readonly List<ToDoItem> _tasks = [];
-
         public ToDoItem Add(ToDoUser botUser, string name)
         {
             int spaceChecker = name.IndexOf(' ');
@@ -98,26 +95,8 @@ namespace OtusTest3
                 _userService.RegisterUser(update.Message.From.Id, update.Message.From.Username);
             }
         }
-        public void HelpPanel(ITelegramBotClient botClient, Update update)
-        {
-                _telegramBotClient.SendMessage(update.Message.Chat, " " 
-                    + update.Message.From.Username + " чтобы пользоваться программой" +
-                "\n пожалуйста вводите комманды /start, /help, /info, /exit" +
-                "\n /start - задает или меняет ваше имя" +
-                "\n /help - доска информации" +
-                "\n /info - дата создания программы" +
-                "\n /addtask - добавить карту" +
-                "\n /showtasks - показать список карт со статусом Active" +
-                "\n /showalltasks - показать список всех карт" +
-                "\n /removetask - убрать карту" +
-                "\n /completetask - поставить статус карте - Completed" +
-                "\n /exit - выход из программы");
-        }
-        public void InfoPanel(Update update)
-        {
-            _telegramBotClient.SendMessage(update.Message.Chat, update.Message.From.Username + 
-                "версия программы - 0.0.7, дата создания 18.11.2025б " + "редактура от 27.01.2026");
-        }
+
+
         public bool ExitPanel(out bool appState, Update update)
         {
             Console.WriteLine(update.Message.From.Username + " Нажмите любую кнопку, чтобы выйти");
