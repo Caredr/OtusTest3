@@ -10,7 +10,6 @@ namespace OtusTest3
 {
     internal class ToDoService : IToDoService
     {
-        private IUserService _userService;
         public readonly int TaskCountLimit = 100;
         public readonly int TaskLengthLimitMax = 100;
         public readonly int TaskLengthLimitMin = 3;
@@ -86,22 +85,6 @@ namespace OtusTest3
                 }
                 else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
             }
-        }
-        public void StartPanel(ITelegramBotClient botClient, Update update)
-        {
-            var user = _userService.GetUser(update.Message.From.Id);
-            if (user == null)
-            {
-                _userService.RegisterUser(update.Message.From.Id, update.Message.From.Username);
-            }
-        }
-
-
-        public bool ExitPanel(out bool appState, Update update)
-        {
-            Console.WriteLine(update.Message.From.Username + " Нажмите любую кнопку, чтобы выйти");
-            appState = false;
-            return appState;
         }
         public void CountAdd()
         {
