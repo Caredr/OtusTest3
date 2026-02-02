@@ -12,24 +12,23 @@ namespace OtusTest3
         private readonly List<ToDoUser> _toDoUserList = [];
         public ToDoUser? GetUser(long telegramUserId)
         {
-            var userСurrent = new ToDoUser();
             foreach(var user in _toDoUserList)
             {
                 if(user.TelegramUserId == telegramUserId)
                 {
-                    userСurrent = user;
+                    return user;
                 }
             }
-            return userСurrent;
+            return null;
         }
         public ToDoUser RegisterUser(long telegramUserId, string telegramUserName)
         {
             ArgumentNullException.ThrowIfNull(telegramUserName, nameof(telegramUserName));
-            var userСurrent = new ToDoUser();
+            var userСurrent = new ToDoUser
             {
-                userСurrent.TelegramUserId = telegramUserId;
-                userСurrent.TelegramUserName = telegramUserName;
-            }
+                TelegramUserId = telegramUserId,
+                TelegramUserName = telegramUserName
+            };
             _toDoUserList.Add(userСurrent);
             return userСurrent;
         }
