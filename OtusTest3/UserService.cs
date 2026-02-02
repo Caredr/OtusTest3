@@ -13,8 +13,12 @@ namespace OtusTest3
         public ToDoUser? GetUser(long telegramUserId)
         {
             var userСurrent = new ToDoUser();
+            foreach(var user in _toDoUserList)
             {
-                userСurrent.TelegramUserId = telegramUserId;
+                if(user.TelegramUserId == telegramUserId)
+                {
+                    userСurrent = user;
+                }
             }
             return userСurrent;
         }
@@ -26,6 +30,7 @@ namespace OtusTest3
                 userСurrent.TelegramUserId = telegramUserId;
                 userСurrent.TelegramUserName = telegramUserName;
             }
+            _toDoUserList.Add(userСurrent);
             return userСurrent;
         }
     }
