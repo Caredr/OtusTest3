@@ -17,14 +17,14 @@ namespace OtusTest3
         private bool commandAccess = false;
         public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
         {
+            string commandEater = update.Message.Text.Trim();
             Guid taskId;
             ToDoUser? toDoUser = _userService.GetUser(update.Message.From.Id);
             botClient.SendMessage(update.Message.Chat,"Доступные команды /start, " +
                "/help, /info, /addtask, /showtasks, /removetask,/completetask,/showalltasks, /exit");
-            bool isRun = true;
-            while (isRun)
-            {
-                string commandEater = Console.ReadLine() ?? "";
+            //bool isRun = true;
+            //while (isRun)
+            //{
                 switch (commandEater)
                 {
                     case "/start":  
@@ -46,10 +46,10 @@ namespace OtusTest3
                         botClient.SendMessage(update.Message.Chat, "таска добавленна");
                         break;
                     case "/showtasks" when commandAccess == true:
-                        _toDoService.GetAllByUserId(toDoUser.UserId);
+                        _toDoService.GetActiveByUserId(toDoUser.UserId);
                         break;
                     case "/showalltasks" when commandAccess == true:
-                        _toDoService.GetActiveByUserId(toDoUser.UserId);
+                        _toDoService.GetAllByUserId(toDoUser.UserId);
                         break;
                     case string s when s.StartsWith("/removetask") && commandAccess == true:
                         if (Guid.TryParse(commandEater, out taskId))
@@ -66,19 +66,18 @@ namespace OtusTest3
                             botClient.SendMessage(update.Message.Chat, "Задача завершена");
                         }
                         break;
-                    case "/exit":
-                        isRun = ExitPanel(out isRun, botClient, update);
-                        break;
+                    //case "/exit":
+                    //    isRun = ExitPanel(out isRun, botClient, update);
+                    //    break;
                     default:
                         botClient.SendMessage(update.Message.Chat, "Ошибка, введите доступную команду");
                         break;
                 }
-            }
-        }
+              }
+        //}
         public void StartPanel(ITelegramBotClient botClient, Update update)
         {
-            var user = _userService.GetUser(update.Message.From.Id);
-            if (user == null)
+            if (_userService.GetUser(update.Message.From.Id) is null)
             {
                 _userService.RegisterUser(update.Message.From.Id, update.Message.From.Username);
             }

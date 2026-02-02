@@ -44,25 +44,27 @@ namespace OtusTest3
         }
         public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
         {
-            foreach(var task in _tasks)
+            var readTasks = new List<ToDoItem>();
+            foreach (var task in _tasks)
             {
                 if(task.Id == userId)
                 {
-                    _tasks.Add(task);
+                    readTasks.Add(task);
                 }
             }
-            return _tasks;
+            return readTasks;
         }
         public IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId)
         {
+            var readTasks = new List<ToDoItem>();
             foreach (var task in _tasks)
             {
                 if (task.Id == userId && task.State == ToDoItemState.Active)
                 {
-                    _tasks.Add(task);
+                    readTasks.Add(task);
                 }
             }
-            return _tasks;
+            return readTasks;
         }
         public void MarkCompleted(Guid id)
         {
