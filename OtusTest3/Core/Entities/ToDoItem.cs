@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OtusTest3
+namespace OtusTest3.Core.Entities
 {
     internal class ToDoItem
     {

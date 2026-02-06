@@ -1,15 +1,23 @@
 ﻿using Otus.ToDoList.ConsoleBot;
 using Otus.ToDoList.ConsoleBot.Types;
+using OtusTest3.Core.DataAccess;
+using OtusTest3.Core.Entities;
+using OtusTest3.Core.Exeptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OtusTest3
+namespace OtusTest3.Core.Services
 {
     internal class ToDoService : IToDoService
     {
+        private IToDoRepository _toDoRepository;
+        public ToDoService(IToDoRepository toDoRepository)
+        {
+            _toDoRepository = toDoRepository;
+        }
         public readonly int TaskCountLimit = 100;
         public readonly int TaskLengthLimitMax = 100;
         public readonly int TaskLengthLimitMin = 3;
@@ -93,6 +101,21 @@ namespace OtusTest3
             Console.WriteLine("Введите максимальное количество задач"); //1
             string tasksCountstext = Console.ReadLine() ?? "Ошибка";   //2
             TasksLimit(tasksCountstext);
+
+        }
+        public IReadOnlyList<ToDoItem> Find(ToDoUser user, string namePrefix)
+        {
+            var result = new List<ToDoItem>();
+
+            foreach (var item in _tasks)
+            {
+                if (item.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Add(item);
+                }
+            }
+
+            return result;
 
         }
         private static void ParseAndValidateInt(string? str, int min, int max)
