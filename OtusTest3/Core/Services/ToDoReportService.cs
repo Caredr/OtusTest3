@@ -8,8 +8,13 @@ using System.Threading.Tasks;
 
 namespace OtusTest3.Core.Services
 {
-    internal class ToDoReportService : IToDoReportService
+    internal class ToDoReportService 
     {
+        private IToDoReportService _iToDoReportService;
+        public ToDoReportService(IToDoReportService iToDoReportService) 
+        {
+            iToDoReportService = _iToDoReportService;
+        }
         private InMemoryToDoRepository _inMemoryToDoRepository = new();
         public (int total, int completed, int active, DateTime generatedAt)  GetUserStats(Guid userId)
         {
@@ -17,7 +22,6 @@ namespace OtusTest3.Core.Services
             int completed = 0;
             int active = 0;
             DateTime generatedAt;
-            var itemlist = _inMemoryToDoRepository.IToDoItemList;
             total = _inMemoryToDoRepository.GetActiveByUserId(userId).Count;
             active = _inMemoryToDoRepository.GetActiveByUserId(userId).Count;
             completed = total - active;

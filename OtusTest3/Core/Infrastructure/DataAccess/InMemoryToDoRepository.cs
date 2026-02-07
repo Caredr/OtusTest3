@@ -11,10 +11,7 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
     internal class InMemoryToDoRepository : IToDoRepository
     {
         private readonly List<ToDoItem> _toDoItemList = [];
-        public List<ToDoItem> IToDoItemList
-        {
-            get { return _toDoItemList; }
-        }
+
         public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
         {
             var readTasks = new List<ToDoItem>();
@@ -56,11 +53,11 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
         }
         public void Update(ToDoItem item)
         {
-            foreach (var itemUpdated in _toDoItemList)
+            for(int i = 0; i < _toDoItemList.Count; i++)
             {
-                if(itemUpdated == item)
+                if (_toDoItemList[i].Id == item.Id)
                 {
-                    
+                    _toDoItemList[i] = item;
                 }
             }
         }
