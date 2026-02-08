@@ -13,7 +13,7 @@ namespace OtusTest3.Core.Services
 {
     internal class ToDoService : IToDoService
     {
-        private IToDoRepository _toDoRepository;
+        private readonly IToDoRepository _toDoRepository;
         public ToDoService(IToDoRepository toDoRepository)
         {
             _toDoRepository = toDoRepository;

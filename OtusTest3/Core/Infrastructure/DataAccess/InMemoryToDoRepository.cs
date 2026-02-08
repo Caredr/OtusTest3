@@ -11,7 +11,6 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
     internal class InMemoryToDoRepository : IToDoRepository
     {
         private readonly List<ToDoItem> _toDoItemList = [];
-
         public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
         {
             var readTasks = new List<ToDoItem>();
