@@ -19,11 +19,8 @@ namespace OtusTest3
                 ConsoleBotClient botClient = new();
                 InMemoryUserRepository inMemoryUserRepository = new();
                 InMemoryToDoRepository inMemoryToDoRepository = new();
-
-                ToDoReportService toDoReportService = new ToDoReportService(inMemoryToDoRepository);
                 UserService UserService = new UserService(inMemoryUserRepository);
-
-
+                ToDoReportService toDoReportService = new ToDoReportService(inMemoryToDoRepository);
                 botClient.StartReceiving(new UpdateHandler(UserService, inMemoryToDoRepository, toDoReportService));
             }
             // Когда статический конструктор класса падает с ошибкой
