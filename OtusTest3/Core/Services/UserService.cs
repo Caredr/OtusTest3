@@ -17,17 +17,10 @@ namespace OtusTest3.Core.Services
         {
             _iUserRepository = iUserRepository;
         }
-        private readonly List<ToDoUser> _toDoUserList = [];
+
         public ToDoUser? GetUser(long telegramUserId)
         {
-            foreach (var user in _toDoUserList)
-            {
-                if (user.TelegramUserId == telegramUserId)
-                {
-                    return user;
-                }
-            }
-            return null;
+            return _iUserRepository.GetUserByTelegramUserId(telegramUserId);
         }
         public ToDoUser RegisterUser(long telegramUserId, string telegramUserName)
         {
@@ -37,7 +30,7 @@ namespace OtusTest3.Core.Services
                 TelegramUserId = telegramUserId,
                 TelegramUserName = telegramUserName
             };
-            _toDoUserList.Add(userСurrent);
+            _iUserRepository.Add(userСurrent);
             return userСurrent;
         }
     }

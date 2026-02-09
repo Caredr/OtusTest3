@@ -8,22 +8,21 @@ using System.Threading.Tasks;
 
 namespace OtusTest3.Core.Services
 {
-    internal class ToDoReportService 
+    internal class ToDoReportService : IToDoReportService
     {
-        private IToDoReportService _iToDoReportService;
-        public ToDoReportService(IToDoReportService iToDoReportService) 
+        private readonly IToDoRepository _iToDoRepository;
+        public ToDoReportService(IToDoRepository inMemoryToDoRepository)
         {
-            iToDoReportService = _iToDoReportService;
+            _iToDoRepository = inMemoryToDoRepository;
         }
-        private InMemoryToDoRepository _inMemoryToDoRepository = new();
         public (int total, int completed, int active, DateTime generatedAt)  GetUserStats(Guid userId)
         {
             int total = 0;
             int completed = 0;
             int active = 0;
             DateTime generatedAt;
-            total = _inMemoryToDoRepository.GetActiveByUserId(userId).Count;
-            active = _inMemoryToDoRepository.GetActiveByUserId(userId).Count;
+            total = _iToDoRepository.GetActiveByUserId(userId).Count;
+            active = _iToDoRepository.GetActiveByUserId(userId).Count;
             completed = total - active;
             generatedAt = DateTime.UtcNow;
             return (total, completed, active, generatedAt);

@@ -1,5 +1,6 @@
 ﻿using Otus.ToDoList.ConsoleBot;
 using Otus.ToDoList.ConsoleBot.Types;
+using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
 using OtusTest3.Core.Infrastructure.DataAccess;
 using OtusTest3.Core.Services;
@@ -11,13 +12,13 @@ namespace OtusTest3.Core.TelegramBot
     {
         private readonly IUserService _userService;
         private readonly InMemoryToDoRepository _inMemoryToDoRepository;
-        private readonly ToDoReportService _toDoReportService;
+        private readonly IToDoReportService _iToDoReportService;
 
-        public UpdateHandler(IUserService userService, InMemoryToDoRepository inMemoryToDoRepository, ToDoReportService toDoReportService)
+        public UpdateHandler(IUserService userService, InMemoryToDoRepository inMemoryToDoRepository, IToDoReportService iToDoReportService)
         {
             _userService = userService;
             _inMemoryToDoRepository = inMemoryToDoRepository;
-            _toDoReportService = toDoReportService;
+            _iToDoReportService = iToDoReportService;
         }
         private bool commandAccess = false;
         public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
@@ -73,7 +74,7 @@ namespace OtusTest3.Core.TelegramBot
                     }
                     break;
                 case "/report" when commandAccess == true:
-                    _toDoReportService.GetUserStats(toDoUser.UserId);
+                    _iToDoReportService.GetUserStats(toDoUser.UserId);
                         break;
 
                 default:
