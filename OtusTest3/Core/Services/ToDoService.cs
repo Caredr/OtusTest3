@@ -13,15 +13,15 @@ namespace OtusTest3.Core.Services
 {
     internal class ToDoService : IToDoService
     {
-        private IToDoRepository _toDoRepository;
+        private readonly IToDoRepository _iToDoRepository;
         public ToDoService(IToDoRepository toDoRepository)
         {
-            _toDoRepository = toDoRepository;
+            _iToDoRepository = toDoRepository;
         }
         public readonly int TaskCountLimit = 100;
         public readonly int TaskLengthLimitMax = 100;
         public readonly int TaskLengthLimitMin = 3;
-        private readonly List<ToDoItem> _tasks = [];
+
         public ToDoItem Add(ToDoUser botUser, string name)
         {
             int spaceChecker = name.IndexOf(' ');
@@ -34,15 +34,7 @@ namespace OtusTest3.Core.Services
                 //Берется подстрока от символа послепробела и до конца строки.
                 ParseAndValidateInt(taskName, TaskLengthLimitMin, TaskLengthLimitMax);
                 ToDoItem newTask = new(botUser, taskName);
-                foreach (var task in _tasks)
-                {
-                    if (task.Name == taskName)
-                    {
-                        throw new DuplicateTaskException(taskName);
-                    }
-                }
-                _tasks.Add(newTask);
-                if (_tasks.Count > TaskCountLimit) throw new TaskCountLimitException(TaskCountLimit);
+                _iToDoRepository.Add(newTask);
                 return newTask;
             }
             else
@@ -52,49 +44,24 @@ namespace OtusTest3.Core.Services
         }
         public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
         {
-            var readTasks = new List<ToDoItem>();
-            foreach (var task in _tasks)
-            {
-                if (task.Id == userId)
-                {
-                    readTasks.Add(task);
-                }
-            }
-            return readTasks;
+            return _iToDoRepository.GetActiveByUserId(userId);
         }
         public IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId)
         {
-            var readTasks = new List<ToDoItem>();
-            foreach (var task in _tasks)
-            {
-                if (task.Id == userId && task.State == ToDoItemState.Active)
-                {
-                    readTasks.Add(task);
-                }
-            }
-            return readTasks;
+            return  _iToDoRepository.GetActiveByUserId(userId); 
         }
         public void MarkCompleted(Guid id)
         {
-            foreach (var task in _tasks)
+            var item = _iToDoRepository.Get(id);
+            if (item != null)
             {
-                if (task.Id == id)
-                {
-                    task.State = ToDoItemState.Completed;
-                }
-                else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
+                item.State = ToDoItemState.Active;
             }
+                else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
         }
         public void Delete(Guid id)
         {
-            foreach (var task in _tasks)
-            {
-                if (task.Id == id)
-                {
-                    _tasks.Remove(task);
-                }
-                else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
-            }
+            _iToDoRepository.GetActiveByUserId(id);
         }
         public void CountAdd()
         {
@@ -105,17 +72,8 @@ namespace OtusTest3.Core.Services
         }
         public IReadOnlyList<ToDoItem> Find(ToDoUser user, string namePrefix)
         {
-            var result = new List<ToDoItem>();
-
-            foreach (var item in _tasks)
-            {
-                if (item.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    result.Add(item);
-                }
-            }
-
-            return result;
+            return _iToDoRepository.Find(user.UserId, item =>
+       item.Name?.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) == true);
 
         }
         private static void ParseAndValidateInt(string? str, int min, int max)

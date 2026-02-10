@@ -49,7 +49,7 @@ namespace OtusTest3.Core.TelegramBot
                         InfoPanel(botClient, update);
                         break;
                     case string s when s.StartsWith("/addtask") && commandAccess == true:
-                        _iToDoService.Add(new ToDoItem(toDoUser, commandEater));
+                        _iToDoService.Add(toDoUser, commandEater);
                         botClient.SendMessage(update.Message.Chat, "таска добавленна");
                         break;
                     case "/showtasks" when commandAccess == true:
@@ -70,7 +70,7 @@ namespace OtusTest3.Core.TelegramBot
                 case string si when si.StartsWith("/find") && commandAccess == true:
                     if (Guid.TryParse(commandEater, out taskId))
                     {
-                        _iToDoService.Find(toDoUser.UserId, task => task.State == ToDoItemState.Active);
+                        _iToDoService.Find(toDoUser, commandEater);
                     }
                     break;
                 case "/report" when commandAccess == true:
