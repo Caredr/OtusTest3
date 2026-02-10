@@ -55,7 +55,7 @@ namespace OtusTest3.Core.Services
             var item = _iToDoRepository.Get(id);
             if (item != null)
             {
-                item.State = ToDoItemState.Active;
+                item.State = ToDoItemState.Completed;
             }
                 else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
         }
