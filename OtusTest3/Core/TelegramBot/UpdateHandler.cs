@@ -11,13 +11,13 @@ namespace OtusTest3.Core.TelegramBot
     internal class UpdateHandler : IUpdateHandler
     {
         private readonly IUserService _userService;
-        private readonly InMemoryToDoRepository _inMemoryToDoRepository;
+        private readonly IToDoService _iToDoService;
         private readonly IToDoReportService _iToDoReportService;
 
-        public UpdateHandler(IUserService userService, InMemoryToDoRepository inMemoryToDoRepository, IToDoReportService iToDoReportService)
+        public UpdateHandler(IUserService userService, IToDoService iToDoService, IToDoReportService iToDoReportService)
         {
             _userService = userService;
-            _inMemoryToDoRepository = inMemoryToDoRepository;
+            _iToDoService = iToDoService;
             _iToDoReportService = iToDoReportService;
         }
         private bool commandAccess = false;
@@ -49,19 +49,19 @@ namespace OtusTest3.Core.TelegramBot
                         InfoPanel(botClient, update);
                         break;
                     case string s when s.StartsWith("/addtask") && commandAccess == true:
-                        _inMemoryToDoRepository.Add(new ToDoItem(toDoUser, commandEater));
+                        _iToDoService.Add(new ToDoItem(toDoUser, commandEater));
                         botClient.SendMessage(update.Message.Chat, "таска добавленна");
                         break;
                     case "/showtasks" when commandAccess == true:
-                        _inMemoryToDoRepository.GetActiveByUserId(toDoUser.UserId);
+                        _iToDoService.GetActiveByUserId(toDoUser.UserId);
                         break;
                     case "/showalltasks" when commandAccess == true:
-                        _inMemoryToDoRepository.GetAllByUserId(toDoUser.UserId);
+                        _iToDoService.GetAllByUserId(toDoUser.UserId);
                         break;
                     case string s when s.StartsWith("/removetask") && commandAccess == true:
                         if (Guid.TryParse(commandEater, out taskId))
                         {
-                            _inMemoryToDoRepository.Delete(taskId);
+                            _iToDoService.Delete(taskId);
                             botClient.SendMessage(update.Message.Chat, "Задача удалена");
                         }
                         else botClient.SendMessage(update.Message.Chat, "Некорректный идентификатор задачи");
@@ -70,7 +70,7 @@ namespace OtusTest3.Core.TelegramBot
                 case string si when si.StartsWith("/find") && commandAccess == true:
                     if (Guid.TryParse(commandEater, out taskId))
                     {
-                        _inMemoryToDoRepository.Find(toDoUser.UserId, task => task.State == ToDoItemState.Active);
+                        _iToDoService.Find(toDoUser.UserId, task => task.State == ToDoItemState.Active);
                     }
                     break;
                 case "/report" when commandAccess == true:

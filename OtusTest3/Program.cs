@@ -16,12 +16,13 @@ namespace OtusTest3
             //Задаю макс кол-во задач, считываю, идет преобразование.
             try
             {
-                ConsoleBotClient botClient = new();
+                ConsoleBotClient botClient = new();         
                 InMemoryUserRepository inMemoryUserRepository = new();
                 InMemoryToDoRepository inMemoryToDoRepository = new();
                 UserService UserService = new UserService(inMemoryUserRepository);
                 ToDoReportService toDoReportService = new ToDoReportService(inMemoryToDoRepository);
-                botClient.StartReceiving(new UpdateHandler(UserService, inMemoryToDoRepository, toDoReportService));
+                ToDoService toDoService = new(inMemoryToDoRepository);
+                botClient.StartReceiving(new UpdateHandler(UserService, toDoService, toDoReportService));
             }
             // Когда статический конструктор класса падает с ошибкой
             catch (TypeInitializationException ex)
