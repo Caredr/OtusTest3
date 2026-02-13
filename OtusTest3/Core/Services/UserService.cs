@@ -1,25 +1,26 @@
 ﻿using Otus.ToDoList.ConsoleBot.Types;
+using OtusTest3.Core.DataAccess;
+using OtusTest3.Core.Entities;
+using OtusTest3.Core.Infrastructure.DataAccess;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OtusTest3
+namespace OtusTest3.Core.Services
 {
-    internal class UserService: IUserService
+    internal class UserService : IUserService
     {
-        private readonly List<ToDoUser> _toDoUserList = [];
+        private IUserRepository _iUserRepository;
+        public UserService(IUserRepository iUserRepository)
+        {
+            _iUserRepository = iUserRepository;
+        }
+
         public ToDoUser? GetUser(long telegramUserId)
         {
-            foreach(var user in _toDoUserList)
-            {
-                if(user.TelegramUserId == telegramUserId)
-                {
-                    return user;
-                }
-            }
-            return null;
+            return _iUserRepository.GetUserByTelegramUserId(telegramUserId);
         }
         public ToDoUser RegisterUser(long telegramUserId, string telegramUserName)
         {
@@ -29,7 +30,7 @@ namespace OtusTest3
                 TelegramUserId = telegramUserId,
                 TelegramUserName = telegramUserName
             };
-            _toDoUserList.Add(userСurrent);
+            _iUserRepository.Add(userСurrent);
             return userСurrent;
         }
     }

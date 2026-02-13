@@ -1,5 +1,10 @@
 ﻿
 using Otus.ToDoList.ConsoleBot;
+using OtusTest3.Core.DataAccess;
+using OtusTest3.Core.Exeptions;
+using OtusTest3.Core.Infrastructure.DataAccess;
+using OtusTest3.Core.Services;
+using OtusTest3.Core.TelegramBot;
 
 namespace OtusTest3
 {
@@ -11,10 +16,13 @@ namespace OtusTest3
             //Задаю макс кол-во задач, считываю, идет преобразование.
             try
             {
-                ConsoleBotClient botClient = new();
-                UserService UserService = new();
-                ToDoService ToDoService = new();
-                botClient.StartReceiving(new UpdateHandler(UserService, ToDoService));
+                ConsoleBotClient botClient = new();         
+                InMemoryUserRepository inMemoryUserRepository = new();
+                InMemoryToDoRepository inMemoryToDoRepository = new();
+                UserService UserService = new UserService(inMemoryUserRepository);
+                ToDoReportService toDoReportService = new ToDoReportService(inMemoryToDoRepository);
+                ToDoService toDoService = new(inMemoryToDoRepository);
+                botClient.StartReceiving(new UpdateHandler(UserService, toDoService, toDoReportService));
             }
             // Когда статический конструктор класса падает с ошибкой
             catch (TypeInitializationException ex)
