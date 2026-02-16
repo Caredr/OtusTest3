@@ -1,13 +1,15 @@
-﻿using System;
+﻿using OtusTest3.Core.Entities;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OtusTest3
+namespace OtusTest3.Core.DataAccess
 {
     internal interface IToDoService
     {
+        IReadOnlyList<ToDoItem> Find(ToDoUser user, string namePrefix);
         IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId);
         //Возвращает ToDoItem для UserId со статусом Active
         IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId);
