@@ -11,31 +11,32 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
     internal class InMemoryUserRepository: IUserRepository
     {
         private readonly List<ToDoUser> _toDoUserList = [];
-        public ToDoUser? GetUser(Guid userId)
+        public async Task<ToDoUser?> GetUser(Guid userId, CancellationToken ct)
         {
             foreach (var user in _toDoUserList)
             {
                 if (user.UserId == userId)
                 {
-                    return user;
+                    return await Task.FromResult(user);
                 }
             }
-            return null;
+            return  null;
         }
-        public ToDoUser? GetUserByTelegramUserId(long telegramUserId)
+        public async Task<ToDoUser?> GetUserByTelegramUserId(long telegramUserId, CancellationToken ct)
         {
             foreach (var user in _toDoUserList)
             {
                 if (user.TelegramUserId == telegramUserId)
                 {
-                    return user;
+                    return await Task.FromResult(user);
                 }
             }
             return null;
         }
-        public void Add(ToDoUser user)
+        public  Task Add(ToDoUser user, CancellationToken ct)
         {
-            _toDoUserList.Add(user);
+             _toDoUserList.Add(user);
+            return Task.CompletedTask;
         }
     }
 }

@@ -11,7 +11,7 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
     internal class InMemoryToDoRepository : IToDoRepository
     {
         private readonly List<ToDoItem> _toDoItemList = [];
-        public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
+        public async Task<IReadOnlyList<ToDoItem>> GetAllByUserId(Guid userId, CancellationToken ct)
         {
             var readTasks = new List<ToDoItem>();
             foreach (var user in _toDoItemList)
@@ -21,9 +21,9 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                     readTasks.Add(user);
                 }
             }
-            return readTasks;
+            return await Task.FromResult(readTasks);
         }
-        public IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId)
+        public async Task<IReadOnlyList<ToDoItem>> GetActiveByUserId(Guid userId, CancellationToken ct)
         {
             var readTasks = new List<ToDoItem>();
             foreach (var user in _toDoItemList)
@@ -33,56 +33,57 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                     readTasks.Add(user);
                 }
             }
-            return readTasks;
+            return await Task.FromResult(readTasks);
         }
-        public ToDoItem? Get(Guid id)
+        public async Task<ToDoItem?> Get(Guid id, CancellationToken ct)
         {
             foreach (var item in _toDoItemList)
             {
                 if (item.Id == id)
                 {
-                    return item;
+                    return await Task.FromResult(item);
                 }
             }
             return null;
         }
-        public void Add(ToDoItem item)
+        public Task Add(ToDoItem item, CancellationToken ct)
         {
             _toDoItemList.Add(item);
+            return Task.CompletedTask;
         }
-        public void Update(ToDoItem item)
+        public async Task Update(ToDoItem item, CancellationToken ct)
         {
             for(int i = 0; i < _toDoItemList.Count; i++)
             {
                 if (_toDoItemList[i].Id == item.Id)
                 {
-                    _toDoItemList[i] = item;
+                    await Task.FromResult(_toDoItemList[i] = item);
                 }
             }
         }
-        public void Delete(Guid id)
+        public async Task Delete(Guid id, CancellationToken ct)
         {
             foreach (var item in _toDoItemList)
             {
                 if (item.Id == id)
                 {
-                    _toDoItemList.Remove(item);
+                    await Task.FromResult(_toDoItemList.Remove(item));
                     break;
                 }
             }
         }
-        public bool ExistsByName(Guid userId, string name)
+        public async Task<bool> ExistsByName(Guid userId, string name, CancellationToken ct)
         {
             foreach (var item in _toDoItemList)
             {
                 if (item.User.UserId == userId && item.Name == name)
                 {
-                    return true;
+                    return await Task.FromResult(true);
                 }
             }
-            return false;
+            return await Task.FromResult(false);
         }
-        public int CountActive(Guid userId)
+        public async Task<int> CountActive(Guid userId, CancellationToken ct)
         {
             int count = 0;
             foreach (var item in _toDoItemList)
@@ -92,9 +93,9 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                     count++;
                 }
             }
-            return count;
+            return await Task.FromResult(count);
         }
-        public IReadOnlyList<ToDoItem> Find(Guid userId, Func<ToDoItem, bool> predicate)
+        public async Task<IReadOnlyList<ToDoItem>> Find(Guid userId, Func<ToDoItem, bool> predicate, CancellationToken ct)
         {
             var result = new List<ToDoItem>();
             foreach (var item in _toDoItemList)
@@ -104,7 +105,7 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                     result.Add(item);
                 }
             }
-            return result;
+            return await Task.FromResult(result);
         }
         
     }

@@ -8,6 +8,6 @@ namespace OtusTest3.Core.DataAccess
 {
     public interface IToDoReportService
     {
-        public (int total, int completed, int active, DateTime generatedAt) GetUserStats(Guid userId);
+        public Task <(int total, int completed, int active, DateTime generatedAt)> GetUserStats(Guid userId, CancellationToken ct);
     }
 }

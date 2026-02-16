@@ -13,83 +13,86 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IUserService _userService;
         private readonly IToDoService _iToDoService;
         private readonly IToDoReportService _iToDoReportService;
-
         public UpdateHandler(IUserService userService, IToDoService iToDoService, IToDoReportService iToDoReportService)
         {
             _userService = userService;
             _iToDoService = iToDoService;
             _iToDoReportService = iToDoReportService;
         }
+
         private bool commandAccess = false;
-        public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
+        public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
+
             string commandEater = update.Message.Text.Trim();
             Guid taskId = default;
-            
-            ToDoUser? toDoUser = _userService.GetUser(update.Message.From.Id);
-            botClient.SendMessage(update.Message.Chat,"Доступные команды /start, " +
-               "/help, /info, /addtask, /showtasks, /removetask,/completetask,/showalltasks,/report,/find");
-            //bool isRun = true;
-            //while (isRun)
-            //{
+            ToDoUser? toDoUser = await _userService.GetUser(update.Message.From.Id, ct);
+            await botClient.SendMessage(update.Message.Chat,"Доступные команды /start, " +
+               "/help, /info, /addtask, /showtasks, /removetask,/completetask,/showalltasks,/report,/find",ct);
                 switch (commandEater)
                 {
                     case "/start":  
-                        StartPanel(botClient, update);
+                        await StartPanel(botClient, update, ct);
                         commandAccess = true;
                         if(commandAccess == true)
                         {
-                            botClient.SendMessage(update.Message.Chat, "старт дан, commandAccess = true");
+                            await botClient.SendMessage(update.Message.Chat, "старт дан, commandAccess = true", ct);
                         }
                         break;
                     case "/help":
-                        HelpPanel(botClient, update);
+                        await HelpPanel(botClient, update, ct);
                         break;
                     case "/info":
-                        InfoPanel(botClient, update);
+                         await InfoPanel(botClient, update, ct);
                         break;
                     case string s when s.StartsWith("/addtask") && commandAccess == true:
-                        _iToDoService.Add(toDoUser, commandEater);
-                        botClient.SendMessage(update.Message.Chat, "таска добавленна");
+                        await _iToDoService.Add(toDoUser, commandEater, ct);
+                        await botClient.SendMessage(update.Message.Chat, "таска добавленна", ct);
                         break;
                     case "/showtasks" when commandAccess == true:
-                        _iToDoService.GetActiveByUserId(toDoUser.UserId);
+                        await _iToDoService.GetActiveByUserId(toDoUser.UserId, ct);
                         break;
                     case "/showalltasks" when commandAccess == true:
-                        _iToDoService.GetAllByUserId(toDoUser.UserId);
+                        await _iToDoService.GetAllByUserId(toDoUser.UserId, ct);
                         break;
                     case string s when s.StartsWith("/removetask") && commandAccess == true:
                         if (Guid.TryParse(commandEater, out taskId))
                         {
-                            _iToDoService.Delete(taskId);
-                            botClient.SendMessage(update.Message.Chat, "Задача удалена");
+                            await _iToDoService.Delete(taskId, ct);
+                            await botClient.SendMessage(update.Message.Chat, "Задача удалена", ct);
                         }
-                        else botClient.SendMessage(update.Message.Chat, "Некорректный идентификатор задачи");
+                        else await botClient.SendMessage(update.Message.Chat, "Некорректный идентификатор задачи", ct);
                         break;
                    
                 case string si when si.StartsWith("/find") && commandAccess == true:
                     if (Guid.TryParse(commandEater, out taskId))
                     {
-                        _iToDoService.Find(toDoUser, commandEater);
+                        await _iToDoService.Find(toDoUser, commandEater, ct);
                     }
                     break;
                 case "/report" when commandAccess == true:
-                    _iToDoReportService.GetUserStats(toDoUser.UserId);
+                    await _iToDoReportService.GetUserStats(toDoUser.UserId, ct);
                         break;
 
                 default:
-                            botClient.SendMessage(update.Message.Chat, "Ошибка, введите доступную команду");
+                            await botClient.SendMessage(update.Message.Chat, "Ошибка, введите доступную команду", ct);
                             break;
                 }
               }
-        public void StartPanel(ITelegramBotClient botClient, Update update)
+        public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken ct)
         {
-            if (_userService.GetUser(update.Message.From.Id) is null)
-            {
-                _userService.RegisterUser(update.Message.From.Id, update.Message.From.Username);
-            }
+            throw new NullReferenceException(null, exception);
         }
-        public void HelpPanel(ITelegramBotClient botClient, Update update)
+        public Task StartPanel(ITelegramBotClient botClient, Update update,CancellationToken ct)
+        {
+            if (_userService.GetUser(update.Message.From.Id, ct) is null)
+            {
+                _userService.RegisterUser(update.Message.From.Id, update.Message.From.Username, ct);
+
+            }
+            return Task.CompletedTask;
+        }
+        public Task HelpPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             botClient.SendMessage(update.Message.Chat, " "
                 + update.Message.From.Username + " чтобы пользоваться программой" +
@@ -103,12 +106,16 @@ namespace OtusTest3.Core.TelegramBot
             "\n /report - Статистика по задачам" +
             "\n /find - Найти по имени" +
             "\n /removetask - убрать карту" +
-            "\n /completetask - поставить статус карте - Completed" );
+            "\n /completetask - поставить статус карте - Completed", ct);
+            return Task.CompletedTask;
         }
-        public void InfoPanel(ITelegramBotClient botClient, Update update)
+        public Task InfoPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             botClient.SendMessage(update.Message.Chat, update.Message.From.Username +
-                " версия программы - 0.0.7, дата создания 18.11.2025б " + "редактура от 27.01.2026");
+                " версия программы - 0.0.7, дата создания 18.11.2025б " + "редактура от 27.01.2026", ct);
+            return Task.CompletedTask;
         }
+
+
     }
 }

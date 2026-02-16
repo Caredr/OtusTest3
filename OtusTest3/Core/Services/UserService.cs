@@ -1,11 +1,5 @@
-﻿using Otus.ToDoList.ConsoleBot.Types;
-using OtusTest3.Core.DataAccess;
+﻿using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
-using OtusTest3.Core.Infrastructure.DataAccess;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace OtusTest3.Core.Services
@@ -18,11 +12,11 @@ namespace OtusTest3.Core.Services
             _iUserRepository = iUserRepository;
         }
 
-        public ToDoUser? GetUser(long telegramUserId)
+        public async Task<ToDoUser?> GetUser(long telegramUserId, CancellationToken ct)
         {
-            return _iUserRepository.GetUserByTelegramUserId(telegramUserId);
+            return await _iUserRepository.GetUserByTelegramUserId(telegramUserId, ct);
         }
-        public ToDoUser RegisterUser(long telegramUserId, string telegramUserName)
+        public Task<ToDoUser> RegisterUser(long telegramUserId, string telegramUserName, CancellationToken ct)
         {
             ArgumentNullException.ThrowIfNull(telegramUserName, nameof(telegramUserName));
             var userСurrent = new ToDoUser
@@ -30,8 +24,8 @@ namespace OtusTest3.Core.Services
                 TelegramUserId = telegramUserId,
                 TelegramUserName = telegramUserName
             };
-            _iUserRepository.Add(userСurrent);
-            return userСurrent;
+             _iUserRepository.Add(userСurrent, ct);
+            return Task.FromResult(userСurrent);
         }
     }
 }
