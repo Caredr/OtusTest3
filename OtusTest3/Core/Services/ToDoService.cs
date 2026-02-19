@@ -22,7 +22,7 @@ namespace OtusTest3.Core.Services
         public readonly int TaskLengthLimitMax = 100;
         public readonly int TaskLengthLimitMin = 3;
 
-        public ToDoItem Add(ToDoUser botUser, string name)
+        public async Task<ToDoItem> Add(ToDoUser botUser, string name, CancellationToken ct)
         {
             int spaceChecker = name.IndexOf(' ');
             string taskName;
@@ -34,46 +34,48 @@ namespace OtusTest3.Core.Services
                 //Берется подстрока от символа послепробела и до конца строки.
                 ParseAndValidateInt(taskName, TaskLengthLimitMin, TaskLengthLimitMax);
                 ToDoItem newTask = new(botUser, taskName);
-                _iToDoRepository.Add(newTask);
-                return newTask;
+                await _iToDoRepository.Add(newTask, ct);
+                return await Task.FromResult(newTask);
             }
             else
             {
                 throw new NullReferenceException();
             }
         }
-        public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
+        public async Task<IReadOnlyList<ToDoItem>> GetAllByUserId(Guid userId, CancellationToken ct)
         {
-            return _iToDoRepository.GetActiveByUserId(userId);
+            return await _iToDoRepository.GetActiveByUserId(userId, ct);
         }
-        public IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId)
+        public async Task<IReadOnlyList<ToDoItem>> GetActiveByUserId(Guid userId, CancellationToken ct)
         {
-            return  _iToDoRepository.GetActiveByUserId(userId); 
+            return await _iToDoRepository.GetActiveByUserId(userId, ct); 
         }
-        public void MarkCompleted(Guid id)
+        public async Task MarkCompleted(Guid id, CancellationToken ct)
         {
-            var item = _iToDoRepository.Get(id);
+            var item = await _iToDoRepository.Get(id, ct);
             if (item != null)
             {
                 item.State = ToDoItemState.Completed;
             }
                 else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
         }
-        public void Delete(Guid id)
+        public async Task Delete(Guid id, CancellationToken ct)
         {
-            _iToDoRepository.GetActiveByUserId(id);
+            await _iToDoRepository.GetActiveByUserId(id, ct);
         }
+
+        public async Task<IReadOnlyList<ToDoItem>> Find(ToDoUser user, string namePrefix, CancellationToken ct)
+        {
+            return await _iToDoRepository.Find(user.UserId, item =>
+       item.Name?.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) == true, ct);
+
+        }
+
         public void CountAdd()
         {
             Console.WriteLine("Введите максимальное количество задач"); //1
             string tasksCountstext = Console.ReadLine() ?? "Ошибка";   //2
             TasksLimit(tasksCountstext);
-
-        }
-        public IReadOnlyList<ToDoItem> Find(ToDoUser user, string namePrefix)
-        {
-            return _iToDoRepository.Find(user.UserId, item =>
-       item.Name?.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) == true);
 
         }
         private static void ParseAndValidateInt(string? str, int min, int max)

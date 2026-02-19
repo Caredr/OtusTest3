@@ -1,4 +1,5 @@
 ﻿using OtusTest3.Core.DataAccess;
+using OtusTest3.Core.Entities;
 using OtusTest3.Core.Infrastructure.DataAccess;
 using System;
 using System.Collections.Generic;
@@ -15,14 +16,16 @@ namespace OtusTest3.Core.Services
         {
             _iToDoRepository = inMemoryToDoRepository;
         }
-        public (int total, int completed, int active, DateTime generatedAt)  GetUserStats(Guid userId)
+        public async Task<(int total, int completed, int active, DateTime generatedAt)>  GetUserStats(Guid userId, CancellationToken ct)
         {
             int total = 0;
             int completed = 0;
             int active = 0;
             DateTime generatedAt;
-            total = _iToDoRepository.GetActiveByUserId(userId).Count;
-            active = _iToDoRepository.GetActiveByUserId(userId).Count;
+            List<ToDoItem> items = (List<ToDoItem>)await _iToDoRepository.GetActiveByUserId(userId, ct);
+            total = items.Count();
+            items = (List<ToDoItem>)await _iToDoRepository.GetActiveByUserId(userId, ct);
+            active = items.Count;
             completed = total - active;
             generatedAt = DateTime.UtcNow;
             return (total, completed, active, generatedAt);
