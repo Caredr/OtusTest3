@@ -1,6 +1,4 @@
-﻿using Otus.ToDoList.ConsoleBot;
-using Otus.ToDoList.ConsoleBot.Types;
-using OtusTest3.Core.DataAccess;
+﻿using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
 using OtusTest3.Core.Exeptions;
 using System;
