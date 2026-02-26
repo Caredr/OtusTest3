@@ -24,7 +24,7 @@ namespace OtusTest3
                 CancellationTokenSource sourceToken = new CancellationTokenSource();
                 CancellationToken token = sourceToken.Token;
 
-                var botClient = new TelegramBotClient("8531549139:AAGbr5w3jVvce4Bj0FvTXItzOXStzKbJn6c");
+                var botClient = new TelegramBotClient("Token");
              
                 InMemoryUserRepository inMemoryUserRepository = new();
                 InMemoryToDoRepository inMemoryToDoRepository = new();
