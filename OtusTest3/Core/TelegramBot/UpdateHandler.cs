@@ -17,9 +17,6 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IUserService _userService;
         private readonly IToDoService _iToDoService;
         private readonly IToDoReportService _iToDoReportService;
-
-
-
         ReplyKeyboardMarkup replyKeyboard = new ReplyKeyboardMarkup(
             new List<KeyboardButton[]>()
                  {
@@ -37,8 +34,6 @@ namespace OtusTest3.Core.TelegramBot
             // автоматическое изменение размера клавиатуры, если не стоит true,
             ResizeKeyboard = true,
         };
-
-
         public UpdateHandler(IUserService userService, IToDoService iToDoService, IToDoReportService iToDoReportService)
         {
             _userService = userService;
@@ -100,7 +95,14 @@ namespace OtusTest3.Core.TelegramBot
                         await _iToDoService.GetActiveByUserId(toDoUser.UserId, ct);
                         break;
                     case "/report":
-                        await _iToDoService.GetActiveByUserId(toDoUser.UserId, ct);
+                        await _iToDoReportService.GetUserStats(toDoUser.UserId, ct);
+                        var (total, completed, active, generatedAt) = await _iToDoReportService.GetUserStats(toDoUser.UserId, ct);
+                        var text = $"Статистика задач:\n" +
+                        $"- Всего: {total}\n" +
+                        $"- Выполнено: {completed}\n" +
+                        $"- Активные: {active}\n" +
+                        $"- Сформировано: {generatedAt:g}";
+                        await botClient.SendMessage(chatId: update.Message!.Chat.Id,text: text, cancellationToken: ct);
                         break;
                     case "/help":
                         await HelpPanel(botClient, update, ct);
