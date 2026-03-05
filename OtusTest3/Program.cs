@@ -1,31 +1,57 @@
 ﻿
-using Otus.ToDoList.ConsoleBot;
+using Telegram.Bot.Polling;
+using Telegram.Bot.Types;
 using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Exeptions;
 using OtusTest3.Core.Infrastructure.DataAccess;
 using OtusTest3.Core.Services;
 using OtusTest3.Core.TelegramBot;
 using System.Threading.Tasks;
+using Telegram.Bot;
+using Telegram.Bot.Types.Enums;
 
 namespace OtusTest3
 {
     internal class Program
     {
-        private static void Main(string[] args)
+        private static async Task Main(string[] args)
         {
             ArgumentNullException.ThrowIfNull(args);
             //Задаю макс кол-во задач, считываю, идет преобразование.
             try
             {
-                CancellationTokenSource source = new CancellationTokenSource();
-                CancellationToken token = source.Token;
-                ConsoleBotClient botClient = new();         
+
+                CancellationTokenSource sourceToken = new CancellationTokenSource();
+                CancellationToken token = sourceToken.Token;
+
+                var botClient = new TelegramBotClient("8531549139:AAGbr5w3jVvce4Bj0FvTXItzOXStzKbJn6c");
+             
                 InMemoryUserRepository inMemoryUserRepository = new();
                 InMemoryToDoRepository inMemoryToDoRepository = new();
-                UserService UserService = new UserService(inMemoryUserRepository);
+
+                UserService userService = new UserService(inMemoryUserRepository);
                 ToDoReportService toDoReportService = new ToDoReportService(inMemoryToDoRepository);
                 ToDoService toDoService = new(inMemoryToDoRepository);
-                botClient.StartReceiving(new UpdateHandler(UserService, toDoService, toDoReportService), token);
+
+                var updateHandler = new UpdateHandler(userService, toDoService, toDoReportService);
+
+                var receiverOptions = new ReceiverOptions
+                {
+                    AllowedUpdates = [UpdateType.Message],
+                    DropPendingUpdates = true
+                };
+
+                botClient.StartReceiving(updateHandler.HandleUpdateAsync, updateHandler.HandleErrorAsync, receiverOptions, token);
+                 var me = await botClient.GetMe();
+                Console.WriteLine($"{me.FirstName} запущен!");
+                Console.WriteLine("Нажмите А чтобы остановиться");
+                if (Console.ReadLine() == "A")
+                {
+                    sourceToken.Cancel();
+                    Environment.Exit(0);
+                }
+                await Task.Delay(-1); // Устанавливаем бесконечную задержку
+
             }
             // Когда статический конструктор класса падает с ошибкой
             catch (TypeInitializationException ex)
