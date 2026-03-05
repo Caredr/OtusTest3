@@ -30,23 +30,30 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                 await SaveIndexAsync(index);
             }
         }
-        private async Task ScanAndBuildIndexAsync(ToDoIndex index)
+        private Task ScanAndBuildIndexAsync(ToDoIndex index, CancellationToken ct = default)
         {
-            var userFolders = Directory.GetDirectories(_basePath);
-            foreach (string userFolder in userFolders)
+            return Task.Run(() =>
             {
-                if (Guid.TryParse(Path.GetFileName(userFolder), out Guid userId))
+                var userFolders = Directory.GetDirectories(_basePath);
+                foreach (string userFolder in userFolders)
                 {
-                    var itemFiles = Directory.GetFiles(userFolder, "*.json");
-                    foreach (string itemFile in itemFiles)
+                    ct.ThrowIfCancellationRequested();
+
+                    if (Guid.TryParse(Path.GetFileName(userFolder), out Guid userId))
                     {
-                        if (Guid.TryParse(Path.GetFileNameWithoutExtension(itemFile), out Guid itemId))
+                        var itemFiles = Directory.GetFiles(userFolder, "*.json");
+                        foreach (string itemFile in itemFiles)
                         {
-                            index.ItemToUserMap[itemId] = userId;
+                            ct.ThrowIfCancellationRequested();
+
+                            if (Guid.TryParse(Path.GetFileNameWithoutExtension(itemFile), out Guid itemId))
+                            {
+                                index.ItemToUserMap[itemId] = userId;
+                            }
                         }
                     }
                 }
-            }
+            }, ct);
         }
         private string GetFilePath(Guid userId, Guid itemId) => Path.Combine(GetUserFolder(userId), $"{itemId}.json");
         private string GetUserFolder(Guid userId) => Path.Combine(_basePath, userId.ToString());
