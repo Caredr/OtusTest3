@@ -20,18 +20,16 @@ namespace OtusTest3
             //Задаю макс кол-во задач, считываю, идет преобразование.
             try
             {
-
                 CancellationTokenSource sourceToken = new CancellationTokenSource();
                 CancellationToken token = sourceToken.Token;
 
                 var botClient = new TelegramBotClient("Token");
-             
-                InMemoryUserRepository inMemoryUserRepository = new();
-                InMemoryToDoRepository inMemoryToDoRepository = new();
+                var userRepo = new FileUserRepository("data/users");
+                var todoRepo = new FileToDoRepository("data/todos");
 
-                UserService userService = new UserService(inMemoryUserRepository);
-                ToDoReportService toDoReportService = new ToDoReportService(inMemoryToDoRepository);
-                ToDoService toDoService = new(inMemoryToDoRepository);
+                UserService userService = new UserService(userRepo);
+                ToDoReportService toDoReportService = new ToDoReportService(todoRepo);
+                ToDoService toDoService = new(todoRepo);
 
                 var updateHandler = new UpdateHandler(userService, toDoService, toDoReportService);
 
