@@ -15,7 +15,7 @@ namespace OtusTest3.Core.Entities
                 RegisteredAt = DateTime.UtcNow;
                 TelegramUserId = 111;
             }
-            public Guid UserId { get; private set; }
+            public Guid UserId { get;  set; }
             public string TelegramUserName { get; set; }
             public DateTime RegisteredAt { get; private set; }
             public long TelegramUserId { get; set; }

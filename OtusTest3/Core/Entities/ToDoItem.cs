@@ -16,7 +16,7 @@ namespace OtusTest3.Core.Entities
             State = ToDoItemState.Active;
             Id = Guid.NewGuid();
         }
-        public Guid Id { get; private set; }
+        public Guid Id { get; set; }
         public ToDoUser User { get; set; }
         public string Name { get; set; }
         public DateTime CreatedAt { get; set; }
