@@ -2,13 +2,16 @@
 using OtusTest3.Core.Entities;
 using OtusTest3.Core.Infrastructure.DataAccess;
 using OtusTest3.Core.Services;
+using OtusTest3.Core.TelegramBot.Scenaries;
 using System;
+using System.Collections;
 using System.Text;
 using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace OtusTest3.Core.TelegramBot
 {
@@ -17,6 +20,8 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IUserService _userService;
         private readonly IToDoService _iToDoService;
         private readonly IToDoReportService _iToDoReportService;
+        private readonly IEnumerable _scenarios;
+        private readonly IScenarioContextRepository _contextRepository;
         ReplyKeyboardMarkup replyKeyboard = new ReplyKeyboardMarkup(
             new List<KeyboardButton[]>()
                  {
@@ -24,6 +29,7 @@ namespace OtusTest3.Core.TelegramBot
                       {
                            new KeyboardButton("/showalltasks"),
                            new KeyboardButton("/showtasks"),
+                           new KeyboardButton("/addtask"),
                       },
                       new KeyboardButton[]
                       {
@@ -34,27 +40,45 @@ namespace OtusTest3.Core.TelegramBot
             // автоматическое изменение размера клавиатуры, если не стоит true,
             ResizeKeyboard = true,
         };
-        public UpdateHandler(IUserService userService, IToDoService iToDoService, IToDoReportService iToDoReportService)
+        public UpdateHandler(IUserService userService, IToDoService iToDoService, 
+            IToDoReportService iToDoReportService, IEnumerable scenarios, 
+            IScenarioContextRepository contextRepository)
         {
             _userService = userService;
             _iToDoService = iToDoService;
             _iToDoReportService = iToDoReportService;
+            _scenarios = scenarios;
+            _contextRepository = contextRepository;
         }
         private bool commandAccess = false;
         public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             try
             {
+                
                 string commandEater = update.Message.Text.Trim();
                 Guid taskId = default;
                 ToDoUser? toDoUser = await _userService.GetUser(update.Message.From.Id, ct);
+                ScenarioContext context = await _contextRepository.GetContext(update.Message.From.Id, ct);
+                if (commandEater == "/cancel")
+                {
+                    await _contextRepository.ResetContext(update.Message.From.Id, ct);
+                    await SendMainKeyboard(botClient, update.Message.From.Id, update.Message.From.Username, ct);
+                    return;  // Завершаем обработку
+                }
+
+                if (context != null)
+                {
+                    await ProcessScenario(botClient, context, update.Message, ct);
+                    return;
+                }
                 if (toDoUser == null)
                 {
                     toDoUser = await _userService.RegisterUser(update.Message.From.Id, update.Message.From.Username, ct);
                 }
                 if (commandAccess)
                 {
-                    await botClient.SendMessage(update.Message.Chat, "Меню тасок", replyMarkup: replyKeyboard);
+                    await SendMainKeyboard(botClient, update.Message.From.Id, update.Message.From.Username, ct);
                 }
                 switch (commandEater)
                 {
@@ -68,7 +92,7 @@ namespace OtusTest3.Core.TelegramBot
                         }
                         break;
                     case "/showalltasks":
-                        var items = await _iToDoService.GetActiveByUserId(toDoUser.UserId, ct);
+                        var items = await _iToDoService.GetActiveByUserIdAsync(toDoUser.UserId, ct);
                         if (items.Count == 0)
                         {
                             await botClient.SendMessage(chatId: update.Message!.Chat.Id,
@@ -89,10 +113,10 @@ namespace OtusTest3.Core.TelegramBot
                         break;
                     case "Menu":
                         await botClient.SendMessage(update.Message.Chat, "\"Доступные команды /start, \" +\r\n" +
-                        "\"/help, /info, /addtask, /showtasks, /removetask,/completetask,/showalltasks,/report,/find\"", cancellationToken: ct);
+                        "\"/help, /info, /addtask, /showtasks, /removetask,/completetask,/showalltasks,/report,/find,/cansel\"", cancellationToken: ct);
                         break;
                     case "/showtasks":
-                        await _iToDoService.GetActiveByUserId(toDoUser.UserId, ct);
+                        await _iToDoService.GetActiveByUserIdAsync(toDoUser.UserId, ct);
                         break;
                     case "/report":
                         await _iToDoReportService.GetUserStats(toDoUser.UserId, ct);
@@ -110,14 +134,20 @@ namespace OtusTest3.Core.TelegramBot
                     case "/info":
                         await InfoPanel(botClient, update, ct);
                         break;
+
+
                     case string s when s.StartsWith("/addtask") && commandAccess == true:
-                        await _iToDoService.Add(toDoUser, commandEater, ct);
+                        context.CurrentScenario = ScenarioType.AddTask;
+                        await SendCancelKeyboard(botClient, update.Message!.Chat.Id, "Введите название задачи:", ct);
+                        await ProcessScenario(botClient,context, update.Message, ct);
+                        await _iToDoService.AddAsync(toDoUser, commandEater, ct);
                         await botClient.SendMessage(update.Message.Chat, "таска добавленна");
                         break;
+
                     case string s when s.StartsWith("/removetask") && commandAccess == true:
                         if (Guid.TryParse(commandEater, out taskId))
                         {
-                            await _iToDoService.Delete(taskId, ct);
+                            await _iToDoService.DeleteAsync(taskId, ct);
                             await botClient.SendMessage(update.Message.Chat, "Задача удалена");
                         }
                         else await botClient.SendMessage(update.Message.Chat, "Некорректный идентификатор задачи");
@@ -125,7 +155,7 @@ namespace OtusTest3.Core.TelegramBot
                     case string si when si.StartsWith("/find") && commandAccess == true:
                         if (Guid.TryParse(commandEater, out taskId))
                         {
-                            await _iToDoService.Find(toDoUser, commandEater, ct);
+                            await _iToDoService.FindAsync(toDoUser, commandEater, ct);
                         }
                         break;
                     default:
@@ -165,7 +195,8 @@ namespace OtusTest3.Core.TelegramBot
             "\n /report - Статистика по задачам" +
             "\n /find - Найти по имени" +
             "\n /removetask - убрать карту" +
-            "\n /completetask - поставить статус карте - Completed");
+            "\n /completetask - поставить статус карте - Completed" +
+            "\n /cancel  отмена ввода задачи");
             
         }
         public async Task InfoPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
@@ -173,7 +204,64 @@ namespace OtusTest3.Core.TelegramBot
             await  botClient.SendMessage(update.Message.Chat, update.Message.From.Username +
                 " версия программы - 0.0.7, дата создания 18.11.2025б " + "редактура от 27.01.2026");
         }
+        public IScenario GetScenario(ScenarioType scenario)
+        {
+            switch (scenario)
+            {
+                case ScenarioType.None:
+                    return null;
+                case ScenarioType.AddTask:
+                    return null;
+                default:
+                    throw new KeyNotFoundException($"Сценарий {scenario} не найден.");
+            }
 
+        }
+        public async Task ProcessScenario(ITelegramBotClient botClient, ScenarioContext context, Message msg, CancellationToken ct)
+        {
+            IScenario scenario = GetScenario(context.CurrentScenario);
+            ScenarioResult result = await scenario.HandleMessageAsync(botClient, context, msg, ct);
+            if(result == ScenarioResult.Completed)
+            {
+                await _contextRepository.ResetContext(msg.From.Id, ct);
+            }
+            else
+            {
+                await _contextRepository.SetContext(msg.From.Id, context, ct);
+            }
+        }
+        private async Task SendMainKeyboard(ITelegramBotClient bot, long chatId, string text, CancellationToken ct)
+        {
+            var keyboard = new ReplyKeyboardMarkup(
+            new List<KeyboardButton[]>()
+                 {
+                      new KeyboardButton[]
+                      {
+                           new KeyboardButton("/showalltasks"),
+                           new KeyboardButton("/showtasks"),
+                           new KeyboardButton("/addtask"),
+                      },
+                      new KeyboardButton[]
+                      {
+                           new KeyboardButton("/report")
+                      }
+           })
+            {
+                ResizeKeyboard = true
+            };
 
+            await bot.SendMessage(chatId, text, replyMarkup: keyboard, cancellationToken: ct);
+        }
+
+        private async Task SendCancelKeyboard(ITelegramBotClient bot, long chatId, string text, CancellationToken ct)
+        {
+            var keyboard = new ReplyKeyboardMarkup(new KeyboardButton("/cancel"))
+            {
+                ResizeKeyboard = true,
+                OneTimeKeyboard = true  // Скрыть после нажатия
+            };
+
+            await bot.SendMessage(chatId, text, replyMarkup: keyboard, cancellationToken: ct);
+        }
     }
 }

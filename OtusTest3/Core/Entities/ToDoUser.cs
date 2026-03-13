@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace OtusTest3.Core.Entities
 {
-    internal class ToDoUser
+    public class ToDoUser
     {
             public ToDoUser()
             {

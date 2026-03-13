@@ -11,9 +11,6 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
 {
     internal class FileToDoRepository : IToDoRepository
     {
-        private readonly string _basePath;
-        private readonly string _indexPath;
-        private readonly JsonSerializerOptions _options = new() { WriteIndented = true };
         public FileToDoRepository(string basePath)
         {
             _basePath = Path.Combine(basePath, "Items");
@@ -21,6 +18,9 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
             Directory.CreateDirectory(_basePath);
             EnsureIndexExistsAsync().Wait();  // Инициализация при старте
         }
+        private readonly string _basePath;
+        private readonly string _indexPath;
+        private readonly JsonSerializerOptions _options = new() { WriteIndented = true };
         private async Task EnsureIndexExistsAsync()
         {
             if (!File.Exists(_indexPath))
@@ -136,7 +136,8 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
         }
         public async Task Add(ToDoItem item, CancellationToken ct = default)
         {
-            if (item.Id == Guid.Empty) item.Id = Guid.NewGuid();
+            if (item.Id == Guid.Empty) 
+                item.Id = Guid.NewGuid();
 
             // Сохраняем файл
             string userFolder = GetUserFolder(item.User.UserId);

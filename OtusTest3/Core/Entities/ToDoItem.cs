@@ -22,5 +22,6 @@ namespace OtusTest3.Core.Entities
         public DateTime CreatedAt { get; set; }
         public ToDoItemState State { get; set; }
         public DateTime? StateChangedAt { get; set; }
+        public DateTime? DeadLine { get; set; }
     }
 }

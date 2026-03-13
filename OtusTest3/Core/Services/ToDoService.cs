@@ -20,7 +20,7 @@ namespace OtusTest3.Core.Services
         public readonly int TaskLengthLimitMax = 100;
         public readonly int TaskLengthLimitMin = 3;
 
-        public async Task<ToDoItem> Add(ToDoUser botUser, string name, CancellationToken ct)
+        public async Task<ToDoItem> AddAsync(ToDoUser botUser, string name, CancellationToken ct)
         {
             int spaceChecker = name.IndexOf(' ');
             string taskName;
@@ -40,15 +40,15 @@ namespace OtusTest3.Core.Services
                 throw new NullReferenceException();
             }
         }
-        public async Task<IReadOnlyList<ToDoItem>> GetAllByUserId(Guid userId, CancellationToken ct)
+        public async Task<IReadOnlyList<ToDoItem>> GetAllByUserIdAsync(Guid userId, CancellationToken ct)
         {
             return await _iToDoRepository.GetActiveByUserId(userId, ct);
         }
-        public async Task<IReadOnlyList<ToDoItem>> GetActiveByUserId(Guid userId, CancellationToken ct)
+        public async Task<IReadOnlyList<ToDoItem>> GetActiveByUserIdAsync(Guid userId, CancellationToken ct)
         {
             return await _iToDoRepository.GetActiveByUserId(userId, ct); 
         }
-        public async Task MarkCompleted(Guid id, CancellationToken ct)
+        public async Task MarkCompletedAsync(Guid id, CancellationToken ct)
         {
             var item = await _iToDoRepository.Get(id, ct);
             if (item != null)
@@ -57,12 +57,12 @@ namespace OtusTest3.Core.Services
             }
                 else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
         }
-        public async Task Delete(Guid id, CancellationToken ct)
+        public async Task DeleteAsync(Guid id, CancellationToken ct)
         {
             await _iToDoRepository.GetActiveByUserId(id, ct);
         }
 
-        public async Task<IReadOnlyList<ToDoItem>> Find(ToDoUser user, string namePrefix, CancellationToken ct)
+        public async Task<IReadOnlyList<ToDoItem>> FindAsync(ToDoUser user, string namePrefix, CancellationToken ct)
         {
             return await _iToDoRepository.Find(user.UserId, item =>
        item.Name?.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) == true, ct);
