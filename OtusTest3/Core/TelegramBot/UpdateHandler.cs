@@ -11,7 +11,6 @@ using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace OtusTest3.Core.TelegramBot
 {
@@ -20,7 +19,7 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IUserService _userService;
         private readonly IToDoService _iToDoService;
         private readonly IToDoReportService _iToDoReportService;
-        private readonly IEnumerable _scenarios;
+        private readonly IEnumerable<IScenario> _scenarios;
         private readonly IScenarioContextRepository _contextRepository;
         ReplyKeyboardMarkup replyKeyboard = new ReplyKeyboardMarkup(
             new List<KeyboardButton[]>()
@@ -41,7 +40,7 @@ namespace OtusTest3.Core.TelegramBot
             ResizeKeyboard = true,
         };
         public UpdateHandler(IUserService userService, IToDoService iToDoService, 
-            IToDoReportService iToDoReportService, IEnumerable scenarios, 
+            IToDoReportService iToDoReportService, IEnumerable<IScenario> scenarios, 
             IScenarioContextRepository contextRepository)
         {
             _userService = userService;
@@ -140,7 +139,7 @@ namespace OtusTest3.Core.TelegramBot
                         context.CurrentScenario = ScenarioType.AddTask;
                         await SendCancelKeyboard(botClient, update.Message!.Chat.Id, "Введите название задачи:", ct);
                         await ProcessScenario(botClient,context, update.Message, ct);
-                        await _iToDoService.AddAsync(toDoUser, commandEater, ct);
+                        await _iToDoService.AddAsync(toDoUser, commandEater,, ct);
                         await botClient.SendMessage(update.Message.Chat, "таска добавленна");
                         break;
 
@@ -204,18 +203,21 @@ namespace OtusTest3.Core.TelegramBot
             await  botClient.SendMessage(update.Message.Chat, update.Message.From.Username +
                 " версия программы - 0.0.7, дата создания 18.11.2025б " + "редактура от 27.01.2026");
         }
-        public IScenario GetScenario(ScenarioType scenario)
+        public IScenario GetScenario(ScenarioType scenarioType)
         {
-            switch (scenario)
+            var scenario = _scenarios.FirstOrDefault(s => s.CanHandle(scenarioType));
+
+            if (scenario == null)
             {
-                case ScenarioType.None:
-                    return null;
-                case ScenarioType.AddTask:
-                    return null;
-                default:
-                    throw new KeyNotFoundException($"Сценарий {scenario} не найден.");
+                var availableScenarios = string.Join(", ",
+                    _scenarios.Select(s => s.GetType().Name));
+
+                throw new InvalidOperationException(
+                    $"Сценарий для типа '{scenarioType}' не найден. " +
+                    $"Доступные сценарии: {availableScenarios}");
             }
 
+            return scenario;
         }
         public async Task ProcessScenario(ITelegramBotClient botClient, ScenarioContext context, Message msg, CancellationToken ct)
         {
