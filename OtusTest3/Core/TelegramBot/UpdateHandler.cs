@@ -139,7 +139,7 @@ namespace OtusTest3.Core.TelegramBot
                         context.CurrentScenario = ScenarioType.AddTask;
                         await SendCancelKeyboard(botClient, update.Message!.Chat.Id, "Введите название задачи:", ct);
                         await ProcessScenario(botClient,context, update.Message, ct);
-                        await _iToDoService.AddAsync(toDoUser, commandEater,, ct);
+                      
                         await botClient.SendMessage(update.Message.Chat, "таска добавленна");
                         break;
 
