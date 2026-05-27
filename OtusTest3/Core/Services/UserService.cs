@@ -12,7 +12,7 @@ namespace OtusTest3.Core.Services
             _iUserRepository = iUserRepository;
         }
 
-        public async Task<ToDoUser?> GetUser(long telegramUserId, CancellationToken ct)
+        public async Task<ToDoUser?> GetUserAsync(long telegramUserId, CancellationToken ct)
         {
             return await _iUserRepository.GetUserByTelegramUserId(telegramUserId, ct);
         }

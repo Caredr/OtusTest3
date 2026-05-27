@@ -18,17 +18,17 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
             _basePath = basePath;  // Базовая папка из конструктора
             Directory.CreateDirectory(_basePath);
         }
-        private string GetFilePath(Guid userId) => Path.Combine(_basePath, $"{userId}.json");
-        private async Task<ToDoUser?> LoadUserAsync(Guid userId, CancellationToken ct)
+        public  Task<string> GetFilePath(Guid userId) => Task.FromResult(Path.Combine(_basePath, $"{userId}.json"));
+        public async Task<ToDoUser?> LoadUserAsync(Guid userId, CancellationToken ct)
         {
-            string path = GetFilePath(userId);
+            string path =await GetFilePath(userId);
             if (!File.Exists(path)) return null;
             await using var stream = File.OpenRead(path);
             return await JsonSerializer.DeserializeAsync<ToDoUser>(stream, _options, ct);
         }
-        private async Task SaveUserAsync(ToDoUser user, CancellationToken ct)
+        public async Task SaveUserAsync(ToDoUser user, CancellationToken ct)
         {
-            string path = GetFilePath(user.UserId);
+            string path = await GetFilePath(user.UserId);
             await using var stream = File.Create(path);
             await JsonSerializer.SerializeAsync(stream, user, _options, ct);
         }

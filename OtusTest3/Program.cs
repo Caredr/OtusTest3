@@ -28,9 +28,6 @@ namespace OtusTest3
                 var botClient = new TelegramBotClient("Token");
                 var userRepo = new FileUserRepository("data/users"); // директория пользователей
                 var todoRepo = new FileToDoRepository("data/todos"); // директория работы с фалами
-               
-
-                
 
                 UserService userService = new UserService(userRepo);
                 ToDoReportService toDoReportService = new ToDoReportService(todoRepo);

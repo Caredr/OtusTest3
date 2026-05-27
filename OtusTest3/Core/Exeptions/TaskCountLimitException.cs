@@ -6,5 +6,6 @@ using System.Threading.Tasks;
 
 namespace OtusTest3.Core.Exeptions
 {
+    //лимит количества тасок
     public class TaskCountLimitException(int count) : Exception($"Превышенно максимальное количество карт{count}");
 }
