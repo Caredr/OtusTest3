@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace OtusTest3.Core.TelegramBot.Scenaries
 {
-    public enum ScenarioResult
+    public enum ScenarioResult // Видимо результат сценария,  Transition - идет задание, Completed - сценарий завершен
     {
         Transition, Completed 
     }

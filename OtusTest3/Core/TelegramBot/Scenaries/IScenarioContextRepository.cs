@@ -6,10 +6,11 @@ using System.Threading.Tasks;
 
 namespace OtusTest3.Core.TelegramBot.Scenaries
 {
-    internal interface IScenarioContextRepository
+    internal interface IScenarioContextRepository // Сохраняет состояние диалога Telegram бота между сообщениями.
+                                                  // Без этого бот забывает, на каком шаге находится пользователь.
     {
-        Task<ScenarioContext?> GetContext(long userId, CancellationToken ct);
-        Task SetContext(long userId, ScenarioContext context, CancellationToken ct);
-        Task ResetContext(long userId, CancellationToken ct);
+        Task<ScenarioContext?> GetContext(long userId, CancellationToken ct); // Загружает состояние диалога пользователя из БД/файлов/Redis
+        Task SetContext(long userId, ScenarioContext context, CancellationToken ct); // Сериализует ScenarioContext → JSON/BSON, Записывает в хранилище по ключу userId,Перезаписывает существующее состояние 
+        Task ResetContext(long userId, CancellationToken ct); // Удаляет запись из хранилища
     }
 }

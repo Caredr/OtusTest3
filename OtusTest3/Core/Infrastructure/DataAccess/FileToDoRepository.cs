@@ -11,49 +11,63 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
 {
     internal class FileToDoRepository : IToDoRepository
     {
+
         public FileToDoRepository(string basePath)
         {
             _basePath = Path.Combine(basePath, "Items");
             Directory.CreateDirectory(_basePath);
-            Directory.CreateDirectory(_basePath);
-            EnsureIndexExistsAsync().Wait();  // Инициализация при старте
+            _indexPath = Path.Combine(_basePath, "index.json");
+            _ = InitializeAsync();
         }
         private readonly string _basePath;
         private readonly string _indexPath;
         private readonly JsonSerializerOptions _options = new() { WriteIndented = true };
-        private async Task EnsureIndexExistsAsync()
+
+        private async Task InitializeAsync() // Создаем индекс
         {
-            if (!File.Exists(_indexPath))
+            try
             {
-                var index = new ToDoIndex();
-                await ScanAndBuildIndexAsync(index);
-                await SaveIndexAsync(index);
+                await EnsureIndexExistsAsync();
+            }
+            catch (Exception ex)
+            {
+                // Логируем, но не падаем при старте
+                Console.WriteLine($"Index init failed: {ex.Message}");
             }
         }
-        private Task ScanAndBuildIndexAsync(ToDoIndex index, CancellationToken ct = default)
+
+        private async Task EnsureIndexExistsAsync()
         {
-            return Task.Run(() =>
+            if (!File.Exists(_indexPath)) // index.json отсутствует?
             {
-                var userFolders = Directory.GetDirectories(_basePath);
-                foreach (string userFolder in userFolders)
+                var index = new ToDoIndex();    // Создаем пустой
+                await ScanAndBuildIndexAsync(index); // Сканируем файлы
+                await SaveIndexAsync(index);  // Сохраняем
+            }
+        }
+        private Task ScanAndBuildIndexAsync(ToDoIndex index, CancellationToken ct = default) // СКАНИРОВАНИЕ файловой системы
+        {
+            var userFolders = Directory.GetDirectories(_basePath);
+            foreach (string userFolder in userFolders)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (Guid.TryParse(Path.GetFileName(userFolder), out Guid userId))
                 {
-                    ct.ThrowIfCancellationRequested();
+                    var itemFiles = Directory.GetFiles(userFolder, "*.json");
 
-                    if (Guid.TryParse(Path.GetFileName(userFolder), out Guid userId))
+                    foreach (string itemFile in itemFiles)
                     {
-                        var itemFiles = Directory.GetFiles(userFolder, "*.json");
-                        foreach (string itemFile in itemFiles)
-                        {
-                            ct.ThrowIfCancellationRequested();
+                        ct.ThrowIfCancellationRequested();
 
-                            if (Guid.TryParse(Path.GetFileNameWithoutExtension(itemFile), out Guid itemId))
-                            {
-                                index.ItemToUserMap[itemId] = userId;
-                            }
+                        if (Guid.TryParse(Path.GetFileNameWithoutExtension(itemFile), out Guid itemId))
+                        {
+                            index.ItemToUserMap[itemId] = userId;
                         }
                     }
                 }
-            }, ct);
+            }
+            return Task.CompletedTask;
         }
         private string GetFilePath(Guid userId, Guid itemId) => Path.Combine(GetUserFolder(userId), $"{itemId}.json");
         private string GetUserFolder(Guid userId) => Path.Combine(_basePath, userId.ToString());
@@ -86,10 +100,10 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
             return await JsonSerializer.DeserializeAsync<ToDoIndex>(stream, _options) ?? new ToDoIndex();
         }
 
-        private async Task SaveIndexAsync(ToDoIndex index)
+        private async Task SaveIndexAsync(ToDoIndex index, CancellationToken ct = default)
         {
             await using var stream = File.Create(_indexPath);
-            await JsonSerializer.SerializeAsync(stream, index, _options);
+            await JsonSerializer.SerializeAsync(stream, index, _options, ct);
         }
         #endregion
 

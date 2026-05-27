@@ -1,76 +1,283 @@
 ﻿using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
 using OtusTest3.Core.Services;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
+using OtusTest3.Core.TelegramBot.Dto;
 using Telegram.Bot;
-using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace OtusTest3.Core.TelegramBot.Scenaries
 {
     internal class AddTaskScenario : IScenario
     {
-        IUserService _iUserService;
-        IToDoService _iTodoService;
-        public AddTaskScenario(IUserService iuserService, IToDoService iTodoService)
+        private readonly IUserService _userService;
+        private readonly IToDoService _todoService;
+        private readonly IToDoListService _todoListService;
+
+        public AddTaskScenario(
+            IUserService userService,
+            IToDoService todoService,
+            IToDoListService todoListService)
         {
-            _iUserService = iuserService ?? throw new ArgumentNullException(nameof(_iUserService)); 
-            _iTodoService = iTodoService ?? throw new ArgumentNullException(nameof(_iTodoService)); 
+            _userService = userService ?? throw new ArgumentNullException(nameof(userService));
+            _todoService = todoService ?? throw new ArgumentNullException(nameof(todoService));
+            _todoListService = todoListService ?? throw new ArgumentNullException(nameof(todoListService));
         }
 
         public bool CanHandle(ScenarioType scenario)
         {
             return scenario == ScenarioType.AddTask;
         }
-        public async Task<ScenarioResult> HandleMessageAsync(ITelegramBotClient bot, ScenarioContext context, Message message, CancellationToken ct)
+
+        public async Task<ScenarioResult> HandleMessageAsync(
+            ITelegramBotClient bot,
+            ScenarioContext context,
+            Update update,
+            CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
-            var user = context.Context!;
+
+            // 1. Обработка inline‑callback (выбор списка)
+            if (update.CallbackQuery is { } callbackQuery)
+            {
+                return await HandleCallbackQueryAsync(bot, context, callbackQuery, ct);
+            }
+
+            // 2. Обычное сообщение
+            if (update.Message is not { } message)
+                return ScenarioResult.Completed;
+
             var inputText = message.Text?.Trim();
-            
+            var user = context.Context;
+
             switch (context.CurrentStep)
             {
+                // Шаг 0: выбор списка
                 case null:
-                    user = await _iUserService.RegisterUser(message.Chat.Id, message?.From?.Username, ct);
-                    await bot.SendMessage(message.Chat.Id, "Введите название задачи", cancellationToken: ct);
-                    context.CurrentStep = "Name";
-                    return ScenarioResult.Transition;
-                case "Name":
-                    await bot.SendMessage(message.Chat.Id, "Задача добавлена!", cancellationToken: ct);
-                    context.CurrentStep = "Deadline";
-                    return ScenarioResult.Transition;
-                case "Deadline":
-                    // Пытаемся распарсить дату
-                    if (DateTime.TryParseExact(inputText, "dd.MM.yyyy",
-                        null, System.Globalization.DateTimeStyles.None, out DateTime deadline))
                     {
-                        // Дата корректна - добавляем задачу
-                        var taskName = inputText;
-                        await _iTodoService.AddAsync(user, taskName, deadline, ct);
-                        await bot.SendMessage(message.Chat.Id,
-                            $"Задача {taskName} добавлена, дедлайн {deadline:dd.MM.yyyy}!",
+                        if (user == null)
+                        {
+                            user = await _userService.RegisterUser(message.Chat.Id, message.From?.Username, ct);
+                            context.Context = user;
+                        }
+
+                        var lists = await _todoListService.GetUserListsAsync(user.UserId, ct);
+
+                        var rows = new List<IEnumerable<InlineKeyboardButton>>();
+
+                        // 📌 Без списка
+                        var noListDto = new ToDoListCallbackDto
+                        {
+                            Action = "addtask_list",
+                            ToDoListId = Guid.Empty
+                        };
+                        var noListData = ToDoListCallbackDto.ToString(noListDto);
+                        rows.Add(new[]
+                        {
+                    InlineKeyboardButton.WithCallbackData("📌Без списка", noListData)
+                });
+
+                        // Списки пользователя
+                        foreach (var list in lists)
+                        {
+                            var dto = new ToDoListCallbackDto
+                            {
+                                Action = "addtask_list",
+                                ToDoListId = list.Id
+                            };
+                            var callbackData = ToDoListCallbackDto.ToString(dto);
+                            if (callbackData.Length > 64)
+                                callbackData = callbackData[..64];
+
+                            rows.Add(new[]
+                            {
+                        InlineKeyboardButton.WithCallbackData(list.Name ?? "(без имени)", callbackData)
+                    });
+                        }
+
+                        var markup = new InlineKeyboardMarkup(rows);
+
+                        await bot.SendMessage(
+                            chatId: message.Chat.Id,
+                            text: "Выберите список для новой задачи:",
+                            replyMarkup: markup,
                             cancellationToken: ct);
-                        return ScenarioResult.Completed;
-                    }
-                    else
-                    {
-                        // Неверный формат даты - запрашиваем снова
-                        await bot.SendMessage(message.Chat.Id,
-                            "Неверный формат даты. Введите дату в формате ДД.ММ.ГГГГ",
-                            cancellationToken: ct);
+
+                        context.CurrentStep = "SelectList";
                         return ScenarioResult.Transition;
                     }
 
+                // Шаг 1: ввод имени
+                case "Name":
+                    {
+                        if (string.IsNullOrWhiteSpace(inputText))
+                        {
+                            await bot.SendMessage(
+                                message.Chat.Id,
+                                "Название не может быть пустым!",
+                                cancellationToken: ct);
+                            return ScenarioResult.Transition;
+                        }
+
+                        context.Data["TaskName"] = inputText;
+
+                        await bot.SendMessage(
+                            message.Chat.Id,
+                            "Введите дедлайн (ДД.ММ.ГГГГ) или /skip для без дедлайна:",
+                            cancellationToken: ct);
+
+                        context.CurrentStep = "Deadline";
+                        return ScenarioResult.Transition;
+                    }
+
+                // Шаг 2: дедлайн + фактическое создание задачи
+                case "Deadline":
+                    {
+                        if (!context.Data.TryGetValue("TaskName", out var taskNameObj) ||
+                            taskNameObj is not string taskName ||
+                            string.IsNullOrWhiteSpace(taskName))
+                        {
+                            await bot.SendMessage(
+                                message.Chat.Id,
+                                "❌ Ошибка: название задачи потеряно. Начните заново.",
+                                cancellationToken: ct);
+
+                            context.CurrentStep = null;
+                            context.Data.Clear();
+                            return ScenarioResult.Completed;
+                        }
+
+                        if (user == null)
+                        {
+                            await bot.SendMessage(
+                                message.Chat.Id,
+                                "❌ Ошибка: пользователь не найден. Начните заново.",
+                                cancellationToken: ct);
+                            context.CurrentStep = null;
+                            context.Data.Clear();
+                            return ScenarioResult.Completed;
+                        }
+
+                        // Восстанавливаем выбранный список
+                        ToDoList? list = null;
+                        if (context.Data.TryGetValue("ToDoList", out var listObj) &&
+                            listObj is ToDoList selectedList)
+                        {
+                            // Guid.Empty мы конвертируем в null ещё в CallbackQuery‑части
+                            list = selectedList;
+                        }
+
+                        if (DateTime.TryParseExact(
+                                inputText ?? "",
+                                "dd.MM.yyyy",
+                                null,
+                                System.Globalization.DateTimeStyles.None,
+                                out DateTime deadline))
+                        {
+                            var item = await _todoService.AddAsync(user, taskName, list, deadline, ct);
+
+                            await bot.SendMessage(
+                                message.Chat.Id,
+                                $"✅ *{taskName}*\n📅 Дедлайн: `{deadline:dd.MM.yyyy}`\n🆔 `{item.Id}`",
+                                cancellationToken: ct,
+                                parseMode: ParseMode.Markdown);
+
+                            context.CurrentStep = null;
+                            context.Data.Clear();
+                            return ScenarioResult.Completed;
+                        }
+                        else if ((inputText ?? "").Equals("/skip", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var item = await _todoService.AddAsync(user, taskName, list, DateTime.MaxValue, ct);
+
+                            await bot.SendMessage(
+                                message.Chat.Id,
+                                $"✅ *{taskName}* добавлена без дедлайна!\n🆔 `{item.Id}`",
+                                cancellationToken: ct,
+                                parseMode: ParseMode.Markdown);
+
+                            context.CurrentStep = null;
+                            context.Data.Clear();
+                            return ScenarioResult.Completed;
+                        }
+                        else
+                        {
+                            await bot.SendMessage(
+                                message.Chat.Id,
+                                "❌ Неверный формат!\n💡 Пример: `15.12.2024`\n💡 Или `/skip` для без дедлайна",
+                                cancellationToken: ct,
+                                parseMode: ParseMode.Markdown);
+                            return ScenarioResult.Transition;
+                        }
+                    }
+
+                case "SelectList":
+                    // В этом шаге работаем только через CallbackQuery
+                    return ScenarioResult.Transition;
+
                 default:
-                    await bot.SendMessage(message.Chat.Id, "Неизвестный шаг", cancellationToken: ct);
+                    await bot.SendMessage(
+                        message.Chat.Id,
+                        "Неизвестный шаг",
+                        cancellationToken: ct);
+                    context.CurrentStep = null;
+                    context.Data.Clear();
                     return ScenarioResult.Completed;
             }
+        }
+
+        /// <summary>
+        /// Обработка callback'ов внутри AddTaskScenario (выбор списка).
+        /// </summary>
+        private async Task<ScenarioResult> HandleCallbackQueryAsync(
+            ITelegramBotClient bot,
+            ScenarioContext context,
+            CallbackQuery callbackQuery,
+            CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var data = callbackQuery.Data ?? string.Empty;
+
+            if (context.CurrentStep != "SelectList")
+            {
+                await bot.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return ScenarioResult.Transition;
+            }
+
+            var dto = ToDoListCallbackDto.FromString(data);
+
+            if (dto.Action != "addtask_list")
+            {
+                await bot.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return ScenarioResult.Transition;
+            }
+
+            // Получаем ToDoList по Guid (или null, если Guid.Empty)
+            ToDoList? list = null;
+            if (dto.ToDoListId != Guid.Empty)
+            {
+                list = await _todoListService.GetAsync(dto.ToDoListId, ct);
+            }
+
+            // Сохраняем сам ToDoList (а не Guid), чтобы потом отдать в AddAsync
+            if (list != null)
+                context.Data["ToDoList"] = list;
+            else
+                context.Data.Remove("ToDoList"); // "без списка"
+
+            var chatId = callbackQuery.Message!.Chat.Id;
+
+            await bot.SendMessage(
+                chatId,
+                "Введите название задачи:",
+                cancellationToken: ct);
+
+            context.CurrentStep = "Name";
+
+            await bot.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+            return ScenarioResult.Transition;
         }
     }
 }

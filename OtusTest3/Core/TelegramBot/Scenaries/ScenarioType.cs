@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 namespace OtusTest3.Core.TelegramBot.Scenaries
 {
-    public enum ScenarioType
+    public enum ScenarioType // типы сценариев
     {
-        None, AddTask
+        None, AddTask, AddList, DeleteList
     }
 }

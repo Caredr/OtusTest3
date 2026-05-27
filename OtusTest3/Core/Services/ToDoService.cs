@@ -2,6 +2,7 @@
 using OtusTest3.Core.Entities;
 using OtusTest3.Core.Exeptions;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,7 +21,7 @@ namespace OtusTest3.Core.Services
         public readonly int TaskLengthLimitMax = 100;
         public readonly int TaskLengthLimitMin = 3;
 
-        public async Task<ToDoItem> AddAsync(ToDoUser botUser, string name, CancellationToken ct)
+        public async Task<ToDoItem> AddAsync(ToDoUser user, string name, ToDoList? list, DateTime deadLine, CancellationToken ct)
         {
             int spaceChecker = name.IndexOf(' ');
             string taskName;
@@ -31,7 +32,7 @@ namespace OtusTest3.Core.Services
                 if (taskName.Length > TaskLengthLimitMax) throw new TaskLengthLimitException(taskName.Length, TaskLengthLimitMax);
                 //Берется подстрока от символа послепробела и до конца строки.
                 ParseAndValidateInt(taskName, TaskLengthLimitMin, TaskLengthLimitMax);
-                ToDoItem newTask = new(botUser, taskName);
+                ToDoItem newTask = new(user, taskName);
                 await _iToDoRepository.Add(newTask, ct);
                 return await Task.FromResult(newTask);
             }
@@ -69,12 +70,31 @@ namespace OtusTest3.Core.Services
 
         }
 
-        public void CountAdd()
+        public static void CountAdd()
         {
             Console.WriteLine("Введите максимальное количество задач"); //1
             string tasksCountstext = Console.ReadLine() ?? "Ошибка";   //2
             TasksLimit(tasksCountstext);
 
+        }
+        public async Task<IReadOnlyList<ToDoItem>> GetByUserIdAndList(Guid userId, Guid? listId, CancellationToken ct)
+        {
+            return await Task.Run(() =>
+            {
+                var items = new List<ToDoItem>();
+                foreach (var item in items) // _items — List<ToDoItem>, без .Values
+                {
+                    if (item.User.UserId != userId)
+                        continue;
+                    if (listId.HasValue)
+                    {
+                        if (item.List is null || item.List.Id != listId.Value)
+                            continue;
+                    }
+                    items.Add(item);
+                }
+                return (IReadOnlyList<ToDoItem>)items;
+            }, ct);
         }
         private static void ParseAndValidateInt(string? str, int min, int max)
         {
@@ -83,7 +103,7 @@ namespace OtusTest3.Core.Services
             Validate(taskTextLenght, min, max);
         }
         #region CustomThrows
-        public int TasksLimit(string limit)
+        public static int TasksLimit(string limit)
         {
             int taskCount = int.TryParse(limit, out int result) ? result : 0;
             if (taskCount <= 0 || taskCount > 100)
@@ -92,14 +112,14 @@ namespace OtusTest3.Core.Services
             }
             return taskCount;
         }
-        private int TestTo(string stringToTest)
-        {
-            if (!int.TryParse(stringToTest, out int taskTextLenght))
-            {
-                throw new ArgumentException("Нельзя превратить текст в число");
-            }
-            return taskTextLenght;
-        }
+        //private int TestTo(string stringToTest)
+        //{
+        //    if (!int.TryParse(stringToTest, out int taskTextLenght))
+        //    {
+        //        throw new ArgumentException("Нельзя превратить текст в число");
+        //    }
+        //    return taskTextLenght;
+        //}
         private static string ValidateString(string stringToTest)
         {
             if (string.IsNullOrWhiteSpace(stringToTest))

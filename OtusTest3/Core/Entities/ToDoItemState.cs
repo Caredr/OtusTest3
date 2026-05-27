@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace OtusTest3.Core.Entities
 {
-    internal enum ToDoItemState
+    internal enum ToDoItemState //Состояние задачи
     {
         Active,
         Completed
