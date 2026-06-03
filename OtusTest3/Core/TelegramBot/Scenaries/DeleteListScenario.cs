@@ -40,7 +40,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
             {
                 case null:
                     var todoUser = await _userService.GetUserAsync(update.Message.From.Id, ct);
-                    context.Context = user;
+                    context.Context = todoUser;
                     // Отправляем сообщение
                     await bot.SendMessage(update.Message.Chat.Id, "Выберите список для удаления:",
                         cancellationToken: ct);

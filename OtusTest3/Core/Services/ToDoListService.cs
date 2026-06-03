@@ -12,6 +12,8 @@ namespace OtusTest3.Core.Services
     {
         private readonly Dictionary<Guid, ToDoList> _lists = new();
         private const int maxNameLength = 10;
+
+
         public async Task<ToDoList> AddAsync(ToDoUser user, string name, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(name))

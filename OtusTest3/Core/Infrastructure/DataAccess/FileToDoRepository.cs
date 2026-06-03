@@ -45,25 +45,29 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                 await SaveIndexAsync(index);  // Сохраняем
             }
         }
-        private async Task ScanAndBuildIndexAsync(ToDoIndex index, CancellationToken ct = default) // СКАНИРОВАНИЕ файловой системы
+        private Task ScanAndBuildIndexAsync(ToDoIndex index, CancellationToken ct = default) // СКАНИРОВАНИЕ файловой системы
         {
-            var userFolders = Directory.GetDirectories(_basePath); //Получение списка папок пользователей
-            foreach (string userFolder in userFolders) //Внешний цикл — сканирование ПАПОК
+            var userFolders = Directory.GetDirectories(_basePath);
+            foreach (string userFolder in userFolders)
             {
-                ct.ThrowIfCancellationRequested();  //Проверка отмены (критично!)
-                if (Guid.TryParse(Path.GetFileName(userFolder), out Guid userId)) //Парсинг ID пользователя из имени папки
+                ct.ThrowIfCancellationRequested();
+
+                if (Guid.TryParse(Path.GetFileName(userFolder), out Guid userId))
                 {
-                    var itemFiles = Directory.GetFiles(userFolder, "*.json"); // Получение файлов задач пользователя
-                    foreach (string itemFile in itemFiles) //Внутренний цикл — сканирование ФАЙЛОВ
-                    { 
-                        ct.ThrowIfCancellationRequested(); //Проверка отмены (второй уровень)
-                        if (Guid.TryParse(Path.GetFileNameWithoutExtension(itemFile), out Guid itemId)) //Парсинг ID задачи из имени файла
+                    var itemFiles = Directory.GetFiles(userFolder, "*.json");
+
+                    foreach (string itemFile in itemFiles)
+                    {
+                        ct.ThrowIfCancellationRequested();
+
+                        if (Guid.TryParse(Path.GetFileNameWithoutExtension(itemFile), out Guid itemId))
                         {
-                            index.ItemToUserMap[itemId] = userId; //Запись в индекс (главное!)
+                            index.ItemToUserMap[itemId] = userId;
                         }
                     }
                 }
             }
+            return Task.CompletedTask;
         }
         private string GetFilePath(Guid userId, Guid itemId) => Path.Combine(GetUserFolder(userId), $"{itemId}.json");
         private string GetUserFolder(Guid userId) => Path.Combine(_basePath, userId.ToString());

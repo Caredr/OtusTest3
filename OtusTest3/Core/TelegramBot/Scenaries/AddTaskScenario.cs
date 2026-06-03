@@ -88,7 +88,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                             };
                             var callbackData = ToDoListCallbackDto.ToString(dto);
                             if (callbackData.Length > 64)
-                                callbackData = callbackData.Substring(0, 64);
+                                callbackData = callbackData[..64];
 
                             rows.Add(new[]
                             {

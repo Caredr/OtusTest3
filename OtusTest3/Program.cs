@@ -1,6 +1,4 @@
-﻿
-using Microsoft.Extensions.DependencyInjection;
-using OtusTest3.Core.DataAccess;
+﻿using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Exeptions;
 using OtusTest3.Core.Infrastructure.DataAccess;
 using OtusTest3.Core.Services;
@@ -27,19 +25,27 @@ namespace OtusTest3
 
                 var botClient = new TelegramBotClient("Token");
                 var userRepo = new FileUserRepository("data/users"); // директория пользователей
-                var todoRepo = new FileToDoRepository("data/todos"); // директория работы с фалами
+                var toDoRepo = new FileToDoRepository("data/todos"); // директория работы с фалами
 
                 UserService userService = new UserService(userRepo);
-                ToDoReportService toDoReportService = new ToDoReportService(todoRepo);
-                ToDoService toDoService = new(todoRepo);
+                ToDoReportService toDoReportService = new ToDoReportService(toDoRepo);
+                ToDoService toDoService = new(toDoRepo);
+                ToDoListService toDoListService = new ToDoListService();
+
                 var scenarios = new List<IScenario>
                 {
-                     new AddTaskScenario(userService, toDoService),      // Передаём сервисы
+                     new AddTaskScenario(userService, toDoService, toDoListService),    // Передаём сервисы
                 };
-                ScenarioType type = ScenarioType.None;
+       
 
                 InMemoryScenarioContextRepository contextRepo = new ();
-                var updateHandler = new UpdateHandler(userService, toDoService, toDoReportService, scenarios, contextRepo);
+                var updateHandler = new UpdateHandler(
+                            userService,
+                            toDoService,
+                            toDoReportService,
+                            scenarios,
+                            contextRepo,
+                            toDoListService);
 
                 var receiverOptions = new ReceiverOptions
                 {

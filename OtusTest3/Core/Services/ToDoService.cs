@@ -70,7 +70,7 @@ namespace OtusTest3.Core.Services
 
         }
 
-        public void CountAdd()
+        public static void CountAdd()
         {
             Console.WriteLine("Введите максимальное количество задач"); //1
             string tasksCountstext = Console.ReadLine() ?? "Ошибка";   //2
@@ -103,7 +103,7 @@ namespace OtusTest3.Core.Services
             Validate(taskTextLenght, min, max);
         }
         #region CustomThrows
-        public int TasksLimit(string limit)
+        public static int TasksLimit(string limit)
         {
             int taskCount = int.TryParse(limit, out int result) ? result : 0;
             if (taskCount <= 0 || taskCount > 100)
@@ -112,14 +112,14 @@ namespace OtusTest3.Core.Services
             }
             return taskCount;
         }
-        private int TestTo(string stringToTest)
-        {
-            if (!int.TryParse(stringToTest, out int taskTextLenght))
-            {
-                throw new ArgumentException("Нельзя превратить текст в число");
-            }
-            return taskTextLenght;
-        }
+        //private int TestTo(string stringToTest)
+        //{
+        //    if (!int.TryParse(stringToTest, out int taskTextLenght))
+        //    {
+        //        throw new ArgumentException("Нельзя превратить текст в число");
+        //    }
+        //    return taskTextLenght;
+        //}
         private static string ValidateString(string stringToTest)
         {
             if (string.IsNullOrWhiteSpace(stringToTest))

@@ -21,7 +21,7 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IEnumerable<IScenario> _scenarios;
         private readonly IScenarioContextRepository _contextRepository;
         private readonly IToDoListService _iToDoListService;
-
+        private readonly int commandDataMaxLenght = 64;
         public UpdateHandler(
             IUserService userService,
             IToDoService iToDoService,
@@ -39,6 +39,7 @@ namespace OtusTest3.Core.TelegramBot
         }
 
         private bool commandAccess = true;
+        
 
         public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
@@ -264,10 +265,10 @@ namespace OtusTest3.Core.TelegramBot
                 ToDoListId = Guid.Empty
             }.ToString();
 
-            rows.Add(new[]
-            {
+            rows.Add(
+            [
             InlineKeyboardButton.WithCallbackData("📌Без списка", noListCallback)
-        });
+        ]);
 
             foreach (var list in lists)
             {
@@ -278,8 +279,8 @@ namespace OtusTest3.Core.TelegramBot
                 };
 
                 var callbackData = dto.ToString();
-                if (callbackData.Length > 64)
-                    callbackData = callbackData.Substring(0, 64);
+                if (callbackData.Length > commandDataMaxLenght)
+                    callbackData = callbackData[..commandDataMaxLenght];
 
                 rows.Add(new[]
                 {
@@ -295,20 +296,21 @@ namespace OtusTest3.Core.TelegramBot
 
             return new InlineKeyboardMarkup(rows);
         }
-        public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken ct)
+        public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken ct)
         {
             throw new NullReferenceException(null, exception);
         }
         public async Task StartPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
-            if (_userService.GetUserAsync(update.Message.From.Id, ct) is null)
+            var user = await _userService.GetUserAsync(update.Message.From.Id, ct);
+            if (user == null)
             {
                 await _userService.RegisterUser(update.Message.From.Id, update.Message.From.Username, ct);
             }
 
             await botClient.SendMessage(update.Message.Chat, "Добро пожаловать!");
         }
-        public async Task HelpPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
+        public static async Task HelpPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             await botClient.SendMessage(update.Message.Chat, " "
                 + update.Message.From.Username + " чтобы пользоваться программой" +
@@ -324,7 +326,7 @@ namespace OtusTest3.Core.TelegramBot
                 "\n /completetask - поставить статус карте - Completed" +
                 "\n /cancel  отмена ввода задачи");
         }
-        public async Task InfoPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
+        public static async Task InfoPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             await botClient.SendMessage(update.Message.Chat, update.Message.From.Username +
                 " версия программы - 0.0.7, дата создания 18.11.2025б " + "редактура от 27.01.2026");
@@ -352,7 +354,7 @@ namespace OtusTest3.Core.TelegramBot
             else
                 await _contextRepository.SetContext(update.Message.From.Id, context, ct);
         }
-        private async Task SendMainKeyboard(ITelegramBotClient bot, long chatId, string text, CancellationToken ct)
+        private static async Task SendMainKeyboard(ITelegramBotClient bot, long chatId, string text, CancellationToken ct)
         {
             var keyboard = new ReplyKeyboardMarkup(
                 new List<KeyboardButton[]>
@@ -372,7 +374,7 @@ namespace OtusTest3.Core.TelegramBot
             };
             await bot.SendMessage(chatId, text, replyMarkup: keyboard, cancellationToken: ct);
         }
-        private async Task SendCancelKeyboard(ITelegramBotClient bot, long chatId, string text, CancellationToken ct)
+        private static async Task SendCancelKeyboard(ITelegramBotClient bot, long chatId, string text, CancellationToken ct)
         {
             var keyboard = new ReplyKeyboardMarkup(new KeyboardButton("/cancel"))
             {
