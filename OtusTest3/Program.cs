@@ -1,13 +1,15 @@
 ﻿
-using Telegram.Bot.Polling;
-using Telegram.Bot.Types;
+using Microsoft.Extensions.DependencyInjection;
 using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Exeptions;
 using OtusTest3.Core.Infrastructure.DataAccess;
 using OtusTest3.Core.Services;
 using OtusTest3.Core.TelegramBot;
+using OtusTest3.Core.TelegramBot.Scenaries;
 using System.Threading.Tasks;
 using Telegram.Bot;
+using Telegram.Bot.Polling;
+using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
 namespace OtusTest3
@@ -30,8 +32,14 @@ namespace OtusTest3
                 UserService userService = new UserService(userRepo);
                 ToDoReportService toDoReportService = new ToDoReportService(todoRepo);
                 ToDoService toDoService = new(todoRepo);
+                var scenarios = new List<IScenario>
+                {
+                     new AddTaskScenario(userService, toDoService),      // Передаём сервисы
+                };
+                ScenarioType type = ScenarioType.None;
 
-                var updateHandler = new UpdateHandler(userService, toDoService, toDoReportService);
+                InMemoryScenarioContextRepository contextRepo = new ();
+                var updateHandler = new UpdateHandler(userService, toDoService, toDoReportService, scenarios, contextRepo);
 
                 var receiverOptions = new ReceiverOptions
                 {

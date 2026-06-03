@@ -7,9 +7,11 @@ using System.Threading.Tasks;
 
 namespace OtusTest3.Core.Services
 {
-    internal interface IUserService
+    internal interface IUserService // Сервис для работы с бизнес-логикой, связанной с пользователями. Он использует IUserRepository для взаимодействия с данными и предоставляет методы для регистрации новых пользователей и получения информации о существующих пользователях.
     {
+        // Регистрирует нового пользователя в системе. Принимает TelegramUserId и TelegramUserName, создает новый объект ToDoUser и сохраняет его в базе данных. Возвращает зарегистрированного пользователя.
         Task<ToDoUser> RegisterUser(long telegramUserId, string telegramUserName, CancellationToken ct);
-        Task<ToDoUser?> GetUser(long telegramUserId, CancellationToken ct);
+        // Получает информацию о пользователе по его TelegramUserId. Принимает TelegramUserId и возвращает объект ToDoUser, если пользователь найден, или null, если пользователь не найден.
+        Task<ToDoUser?> GetUserAsync(long telegramUserId, CancellationToken ct);
     }
 }

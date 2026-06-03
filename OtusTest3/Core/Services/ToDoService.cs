@@ -2,6 +2,7 @@
 using OtusTest3.Core.Entities;
 using OtusTest3.Core.Exeptions;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,7 +21,7 @@ namespace OtusTest3.Core.Services
         public readonly int TaskLengthLimitMax = 100;
         public readonly int TaskLengthLimitMin = 3;
 
-        public async Task<ToDoItem> Add(ToDoUser botUser, string name, CancellationToken ct)
+        public async Task<ToDoItem> AddAsync(ToDoUser user, string name, ToDoList? list, DateTime deadLine, CancellationToken ct)
         {
             int spaceChecker = name.IndexOf(' ');
             string taskName;
@@ -31,7 +32,7 @@ namespace OtusTest3.Core.Services
                 if (taskName.Length > TaskLengthLimitMax) throw new TaskLengthLimitException(taskName.Length, TaskLengthLimitMax);
                 //Берется подстрока от символа послепробела и до конца строки.
                 ParseAndValidateInt(taskName, TaskLengthLimitMin, TaskLengthLimitMax);
-                ToDoItem newTask = new(botUser, taskName);
+                ToDoItem newTask = new(user, taskName);
                 await _iToDoRepository.Add(newTask, ct);
                 return await Task.FromResult(newTask);
             }
@@ -40,15 +41,15 @@ namespace OtusTest3.Core.Services
                 throw new NullReferenceException();
             }
         }
-        public async Task<IReadOnlyList<ToDoItem>> GetAllByUserId(Guid userId, CancellationToken ct)
+        public async Task<IReadOnlyList<ToDoItem>> GetAllByUserIdAsync(Guid userId, CancellationToken ct)
         {
             return await _iToDoRepository.GetActiveByUserId(userId, ct);
         }
-        public async Task<IReadOnlyList<ToDoItem>> GetActiveByUserId(Guid userId, CancellationToken ct)
+        public async Task<IReadOnlyList<ToDoItem>> GetActiveByUserIdAsync(Guid userId, CancellationToken ct)
         {
             return await _iToDoRepository.GetActiveByUserId(userId, ct); 
         }
-        public async Task MarkCompleted(Guid id, CancellationToken ct)
+        public async Task MarkCompletedAsync(Guid id, CancellationToken ct)
         {
             var item = await _iToDoRepository.Get(id, ct);
             if (item != null)
@@ -57,12 +58,12 @@ namespace OtusTest3.Core.Services
             }
                 else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
         }
-        public async Task Delete(Guid id, CancellationToken ct)
+        public async Task DeleteAsync(Guid id, CancellationToken ct)
         {
             await _iToDoRepository.GetActiveByUserId(id, ct);
         }
 
-        public async Task<IReadOnlyList<ToDoItem>> Find(ToDoUser user, string namePrefix, CancellationToken ct)
+        public async Task<IReadOnlyList<ToDoItem>> FindAsync(ToDoUser user, string namePrefix, CancellationToken ct)
         {
             return await _iToDoRepository.Find(user.UserId, item =>
        item.Name?.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) == true, ct);
@@ -75,6 +76,25 @@ namespace OtusTest3.Core.Services
             string tasksCountstext = Console.ReadLine() ?? "Ошибка";   //2
             TasksLimit(tasksCountstext);
 
+        }
+        public async Task<IReadOnlyList<ToDoItem>> GetByUserIdAndList(Guid userId, Guid? listId, CancellationToken ct)
+        {
+            return await Task.Run(() =>
+            {
+                var items = new List<ToDoItem>();
+                foreach (var item in items) // _items — List<ToDoItem>, без .Values
+                {
+                    if (item.User.UserId != userId)
+                        continue;
+                    if (listId.HasValue)
+                    {
+                        if (item.List is null || item.List.Id != listId.Value)
+                            continue;
+                    }
+                    items.Add(item);
+                }
+                return (IReadOnlyList<ToDoItem>)items;
+            }, ct);
         }
         private static void ParseAndValidateInt(string? str, int min, int max)
         {
