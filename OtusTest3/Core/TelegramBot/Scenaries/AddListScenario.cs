@@ -12,12 +12,12 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
         private IToDoListService _iToDoListService;
         public AddListScenario(IUserService iUserService, IToDoListService iToDoListService)
         {
-            iUserService = _iUserService;
-            iToDoListService = _iToDoListService;
+            _iUserService = iUserService ?? throw new ArgumentNullException(nameof(iUserService));
+            _iToDoListService = iToDoListService ?? throw new ArgumentNullException(nameof(iToDoListService));
         }
         public bool CanHandle(ScenarioType scenario)
         {
-            return scenario == ScenarioType.AddTask;
+            return scenario == ScenarioType.AddList;
         }
 
         public async Task<ScenarioResult> HandleMessageAsync(ITelegramBotClient bot, 

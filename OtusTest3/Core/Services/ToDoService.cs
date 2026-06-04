@@ -23,23 +23,25 @@ namespace OtusTest3.Core.Services
 
         public async Task<ToDoItem> AddAsync(ToDoUser user, string name, ToDoList? list, DateTime deadLine, CancellationToken ct)
         {
-            int spaceChecker = name.IndexOf(' ');
-            string taskName;
-            if (spaceChecker > -1 && spaceChecker < name.Length - 1)
-            //Если есть пробел и пробел не послений символ
+            // Валидация: имя не пустое
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Название задачи не может быть пустым.", nameof(name));
+
+            // Валидация длины названия
+            if (name.Length < TaskLengthLimitMin)
+                throw new TaskLengthLimitException(name.Length, TaskLengthLimitMin);
+            if (name.Length > TaskLengthLimitMax)
+                throw new TaskLengthLimitException(name.Length, TaskLengthLimitMax);
+
+            // Создаём задачу с учётом списка и дедлайна
+            ToDoItem newTask = new(user, name)
             {
-                taskName = name[spaceChecker++..];
-                if (taskName.Length > TaskLengthLimitMax) throw new TaskLengthLimitException(taskName.Length, TaskLengthLimitMax);
-                //Берется подстрока от символа послепробела и до конца строки.
-                ParseAndValidateInt(taskName, TaskLengthLimitMin, TaskLengthLimitMax);
-                ToDoItem newTask = new(user, taskName);
-                await _iToDoRepository.Add(newTask, ct);
-                return await Task.FromResult(newTask);
-            }
-            else
-            {
-                throw new NullReferenceException();
-            }
+                List = list,
+                DeadLine = deadLine == DateTime.MaxValue ? null : deadLine
+            };
+
+            await _iToDoRepository.Add(newTask, ct);
+            return newTask;
         }
         public async Task<IReadOnlyList<ToDoItem>> GetAllByUserIdAsync(Guid userId, CancellationToken ct)
         {
@@ -52,15 +54,16 @@ namespace OtusTest3.Core.Services
         public async Task MarkCompletedAsync(Guid id, CancellationToken ct)
         {
             var item = await _iToDoRepository.Get(id, ct);
-            if (item != null)
-            {
-                item.State = ToDoItemState.Completed;
-            }
-                else throw new TaskDoesNotExistException("Задача с таким GUID не существует");
+            if (item == null)
+                throw new TaskDoesNotExistException("Задача с таким GUID не существует");
+
+            item.State = ToDoItemState.Completed;
+            item.StateChangedAt = DateTime.UtcNow;
+            await _iToDoRepository.Update(item, ct);
         }
         public async Task DeleteAsync(Guid id, CancellationToken ct)
         {
-            await _iToDoRepository.GetActiveByUserId(id, ct);
+            await _iToDoRepository.Delete(id, ct);
         }
 
         public async Task<IReadOnlyList<ToDoItem>> FindAsync(ToDoUser user, string namePrefix, CancellationToken ct)
@@ -79,22 +82,14 @@ namespace OtusTest3.Core.Services
         }
         public async Task<IReadOnlyList<ToDoItem>> GetByUserIdAndList(Guid userId, Guid? listId, CancellationToken ct)
         {
-            return await Task.Run(() =>
+            var allItems = await _iToDoRepository.GetActiveByUserId(userId, ct);
+            var filtered = allItems.Where(item =>
             {
-                var items = new List<ToDoItem>();
-                foreach (var item in items) // _items — List<ToDoItem>, без .Values
-                {
-                    if (item.User.UserId != userId)
-                        continue;
-                    if (listId.HasValue)
-                    {
-                        if (item.List is null || item.List.Id != listId.Value)
-                            continue;
-                    }
-                    items.Add(item);
-                }
-                return (IReadOnlyList<ToDoItem>)items;
-            }, ct);
+                if (listId.HasValue)
+                    return item.List is not null && item.List.Id == listId.Value;
+                return item.List is null;
+            }).ToList();
+            return filtered.AsReadOnly();
         }
         private static void ParseAndValidateInt(string? str, int min, int max)
         {

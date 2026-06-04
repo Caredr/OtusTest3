@@ -28,7 +28,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
         }
         public bool CanHandle(ScenarioType scenario)
         {
-            return scenario == ScenarioType.AddTask;
+            return scenario == ScenarioType.DeleteList;
         }
         public async Task<ScenarioResult> HandleMessageAsync(ITelegramBotClient bot,
         ScenarioContext context, Update update, CancellationToken ct)
@@ -99,10 +99,8 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                             return ScenarioResult.Completed;
                         if (data == "yes")
                         {
-                            // Удалить все задачи по ToDoUser и ToDoList
-                            await _todoService.DeleteAsync(todoUser.UserId,  ct);
-                            // УдалитьToDoList
-                            await _todoListService.DeleteAsync(todoUser.UserId,  ct);
+                            // Удалить список по его Id
+                            await _todoListService.DeleteAsync(todoList.Id, ct);
                             await bot.SendMessage(update.Message.Chat.Id,
                                 "Список и все его задачи удалены.",
                                 cancellationToken: ct);
@@ -137,8 +135,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                 return ScenarioResult.Completed;
             if (data == "yes")
             {
-                await _todoService.DeleteAsync(todoUser.UserId,  ct);
-                await _todoListService.DeleteAsync(todoUser.UserId, ct);
+                await _todoListService.DeleteAsync(todoList.Id, ct);
                 await bot.SendMessage(callbackQuery.Message!.Chat.Id,
                     "Список и все его задачи удалены.",
                     cancellationToken: ct);

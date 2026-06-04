@@ -128,10 +128,11 @@ namespace OtusTest3.Core.TelegramBot
                         break;
                     case string s when s.StartsWith("/addtask"):
                         {
-                            context ??= new ScenarioContext(ScenarioType.AddTask);
+                            context = new ScenarioContext(ScenarioType.AddTask);
                             context.Context = toDoUser;
-                            await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите название задачи:", ct);
                             await _contextRepository.SetContext(update.Message.From.Id, context, ct);
+                            // Запускаем сценарий с шага 0 (выбор списка)
+                            await ProcessScenario(botClient, context, update, ct);
                             break;
                         }
                     case "addlist":
@@ -242,7 +243,21 @@ namespace OtusTest3.Core.TelegramBot
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
-            // 3) Остальные callback'и (show и т.п.) — оставь свою текущую логику здесь
+            // 3) Callback для AddTaskScenario (выбор списка)
+            if (context.CurrentScenario == ScenarioType.AddTask &&
+                context.CurrentStep == "SelectList" &&
+                callbackData.StartsWith("addtask_list"))
+            {
+                var scenario = GetScenario(ScenarioType.AddTask);
+                var result = await scenario.HandleMessageAsync(botClient, context, update, ct);
+                if (result == ScenarioResult.Completed)
+                    await _contextRepository.ResetContext(userId, ct);
+                else
+                    await _contextRepository.SetContext(userId, context, ct);
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+            // 4) Остальные callback'и (show и т.п.) — оставь свою текущую логику здесь
             if (callbackData.StartsWith("show"))
             {
                 var dto = ToDoListCallbackDto.FromString(callbackData);
