@@ -201,6 +201,37 @@ namespace OtusTest3.Core.TelegramBot
                 return;
             }
             var callbackData = callbackQuery.Data ?? string.Empty;
+
+            // 0) Запуск сценариев AddList / DeleteList по кнопкам инлайн-клавиатуры
+            if (callbackData == "addlist")
+            {
+                var toDoUser = await _userService.GetUserAsync(userId, ct)
+                    ?? await _userService.RegisterUser(userId, callbackQuery.From.Username, ct);
+                var newContext = new ScenarioContext(ScenarioType.AddList);
+                newContext.Context = toDoUser;
+                await _contextRepository.SetContext(userId, newContext, ct);
+                await botClient.SendMessage(callbackQuery.Message!.Chat.Id,
+                    "Введите название нового списка:",
+                    cancellationToken: ct);
+                newContext.CurrentStep = "Name";
+                await _contextRepository.SetContext(userId, newContext, ct);
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+            if (callbackData == "deletelist")
+            {
+                var toDoUser = await _userService.GetUserAsync(userId, ct)
+                    ?? await _userService.RegisterUser(userId, callbackQuery.From.Username, ct);
+                var newContext = new ScenarioContext(ScenarioType.DeleteList);
+                newContext.Context = toDoUser;
+                await _contextRepository.SetContext(userId, newContext, ct);
+                var scenario = GetScenario(ScenarioType.DeleteList);
+                await scenario.HandleMessageAsync(botClient, newContext, update, ct);
+                await _contextRepository.SetContext(userId, newContext, ct);
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
             // 1) Выбор конкретного списка для сценария DeleteList
             if (context.CurrentScenario == ScenarioType.DeleteList &&
                 context.CurrentStep == "Approve" &&
