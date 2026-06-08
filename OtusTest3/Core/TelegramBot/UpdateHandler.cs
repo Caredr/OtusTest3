@@ -1,4 +1,4 @@
-﻿using OtusTest3.Core.DataAccess;
+using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
 
 using OtusTest3.Core.Services;
@@ -22,6 +22,7 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IScenarioContextRepository _contextRepository;
         private readonly IToDoListService _iToDoListService;
         private readonly int commandDataMaxLenght = 64;
+
         public UpdateHandler(
             IUserService userService,
             IToDoService iToDoService,
@@ -39,7 +40,6 @@ namespace OtusTest3.Core.TelegramBot
         }
 
         private bool commandAccess = true;
-        
 
         public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
@@ -103,7 +103,7 @@ namespace OtusTest3.Core.TelegramBot
 
                             await botClient.SendMessage(
                                 chatId: update.Message.Chat.Id,
-                                text: "Выберите список",
+                                text: "Выберите список:",
                                 replyMarkup: keyboard,
                                 cancellationToken: ct);
                             break;
@@ -131,7 +131,6 @@ namespace OtusTest3.Core.TelegramBot
                             context = new ScenarioContext(ScenarioType.AddTask);
                             context.Context = toDoUser;
                             await _contextRepository.SetContext(update.Message.From.Id, context, ct);
-                            // Запускаем сценарий с шага 0 (выбор списка)
                             await ProcessScenario(botClient, context, update, ct);
                             break;
                         }
@@ -188,21 +187,16 @@ namespace OtusTest3.Core.TelegramBot
                 Console.WriteLine(ex.ToString());
             }
         }
+
         private async Task HandleCallbackQueryAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             if (update.CallbackQuery == null)
                 return;
             var callbackQuery = update.CallbackQuery;
             var userId = callbackQuery.From.Id;
-            var context = await _contextRepository.GetContext(userId, ct);
-            if (context == null)
-            {
-                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
-                return;
-            }
             var callbackData = callbackQuery.Data ?? string.Empty;
 
-            // 0) Запуск сценариев AddList / DeleteList по кнопкам инлайн-клавиатуры
+            // 0) Запуск AddList / DeleteList по инлайн-кнопкам
             if (callbackData == "addlist")
             {
                 var toDoUser = await _userService.GetUserAsync(userId, ct)
@@ -232,8 +226,11 @@ namespace OtusTest3.Core.TelegramBot
                 return;
             }
 
-            // 1) Выбор конкретного списка для сценария DeleteList
-            if (context.CurrentScenario == ScenarioType.DeleteList &&
+            // Получаем контекст пользователя (нужен для сценариев с шагами)
+            var context = await _contextRepository.GetContext(userId, ct);
+
+            // 1) Выбор конкретного списка для DeleteList
+            if (context?.CurrentScenario == ScenarioType.DeleteList &&
                 context.CurrentStep == "Approve" &&
                 callbackData.StartsWith("deletelist"))
             {
@@ -251,14 +248,14 @@ namespace OtusTest3.Core.TelegramBot
                 }
                 context.Data["SelectedList"] = todoList;
                 await _contextRepository.SetContext(userId, context, ct);
-                // продолжаем сценарий — показываем подтверждение
                 var scenario = GetScenario(ScenarioType.DeleteList);
                 await scenario.HandleMessageAsync(botClient, context, update, ct);
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
+
             // 2) Подтверждение удаления yes/no
-            if (context.CurrentScenario == ScenarioType.DeleteList &&
+            if (context?.CurrentScenario == ScenarioType.DeleteList &&
                 context.CurrentStep == "Delete")
             {
                 var scenario = GetScenario(ScenarioType.DeleteList) as DeleteListScenario;
@@ -270,12 +267,12 @@ namespace OtusTest3.Core.TelegramBot
                     else
                         await _contextRepository.SetContext(userId, context, ct);
                 }
-
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
+
             // 3) Callback для AddTaskScenario (выбор списка)
-            if (context.CurrentScenario == ScenarioType.AddTask &&
+            if (context?.CurrentScenario == ScenarioType.AddTask &&
                 context.CurrentStep == "SelectList" &&
                 callbackData.StartsWith("addtask_list"))
             {
@@ -288,19 +285,42 @@ namespace OtusTest3.Core.TelegramBot
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
-            // 4) Остальные callback'и (show и т.п.) — оставь свою текущую логику здесь
+
+            // 4) Просмотр задач выбранного списка (show|{listId})
             if (callbackData.StartsWith("show"))
             {
+                var toDoUser = await _userService.GetUserAsync(userId, ct)
+                    ?? await _userService.RegisterUser(userId, callbackQuery.From.Username, ct);
+
                 var dto = ToDoListCallbackDto.FromString(callbackData);
 
-                // здесь твоя логика показа задач по списку
-                // Guid.Empty = "без списка"
+                // Создаём одноразовый контекст для ShowTasksScenario
+                var showContext = new ScenarioContext(ScenarioType.ShowTasks);
+                showContext.Context = toDoUser;
+
+                // Передаём выбранный список
+                if (dto.ToDoListId != Guid.Empty)
+                {
+                    var list = await _iToDoListService.GetAsync(dto.ToDoListId, ct);
+                    showContext.Data["SelectedListId"] = dto.ToDoListId;
+                    showContext.Data["SelectedListName"] = list?.Name ?? "(без имени)";
+                }
+                else
+                {
+                    showContext.Data["SelectedListId"] = Guid.Empty;
+                    showContext.Data["SelectedListName"] = "Без списка";
+                }
+
+                var showScenario = GetScenario(ScenarioType.ShowTasks);
+                await showScenario.HandleMessageAsync(botClient, showContext, update, ct);
 
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
+
             await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
         }
+
         private InlineKeyboardMarkup BuildShowListsKeyboard(IReadOnlyList<ToDoList> lists)
         {
             var rows = new List<IEnumerable<InlineKeyboardButton>>();
@@ -313,8 +333,8 @@ namespace OtusTest3.Core.TelegramBot
 
             rows.Add(
             [
-            InlineKeyboardButton.WithCallbackData("📌Без списка", noListCallback)
-        ]);
+                InlineKeyboardButton.WithCallbackData("📌 Без списка", noListCallback)
+            ]);
 
             foreach (var list in lists)
             {
@@ -324,28 +344,30 @@ namespace OtusTest3.Core.TelegramBot
                     ToDoListId = list.Id
                 };
 
-                var callbackData = dto.ToString();
+                var callbackData = ToDoListCallbackDto.ToString(dto);
                 if (callbackData.Length > commandDataMaxLenght)
                     callbackData = callbackData[..commandDataMaxLenght];
 
                 rows.Add(new[]
                 {
-                InlineKeyboardButton.WithCallbackData(list.Name ?? "(без имени)", callbackData)
-            });
+                    InlineKeyboardButton.WithCallbackData(list.Name ?? "(без имени)", callbackData)
+                });
             }
 
             rows.Add(new[]
             {
-            InlineKeyboardButton.WithCallbackData("🆕Добавить", "addlist"),
-            InlineKeyboardButton.WithCallbackData("❌Удалить", "deletelist")
-        });
+                InlineKeyboardButton.WithCallbackData("🆕 Добавить", "addlist"),
+                InlineKeyboardButton.WithCallbackData("❌ Удалить", "deletelist")
+            });
 
             return new InlineKeyboardMarkup(rows);
         }
+
         public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken ct)
         {
             throw new NullReferenceException(null, exception);
         }
+
         public async Task StartPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             var user = await _userService.GetUserAsync(update.Message.From.Id, ct);
@@ -353,9 +375,9 @@ namespace OtusTest3.Core.TelegramBot
             {
                 await _userService.RegisterUser(update.Message.From.Id, update.Message.From.Username, ct);
             }
-
             await botClient.SendMessage(update.Message.Chat, "Добро пожаловать!");
         }
+
         public static async Task HelpPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             await botClient.SendMessage(update.Message.Chat, " "
@@ -364,19 +386,21 @@ namespace OtusTest3.Core.TelegramBot
                 "\n /start - задает или меняет ваше имя" +
                 "\n /help - доска информации" +
                 "\n /info - дата создания программы" +
-                "\n /addtask - добавить карту" +
-                "\n /show - показать список всех карт" +
+                "\n /addtask - добавить задачу" +
+                "\n /show - показать списки (выбери список — увидишь задачи)" +
                 "\n /report - Статистика по задачам" +
                 "\n /find - Найти по имени" +
-                "\n /removetask - убрать карту" +
-                "\n /completetask - поставить статус карте - Completed" +
-                "\n /cancel  отмена ввода задачи");
+                "\n /removetask - убрать задачу" +
+                "\n /completetask - поставить статус - Completed" +
+                "\n /cancel  - отмена текущего ввода");
         }
+
         public static async Task InfoPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             await botClient.SendMessage(update.Message.Chat, update.Message.From.Username +
-                " версия программы - 0.0.7, дата создания 18.11.2025б " + "редактура от 27.01.2026");
+                " версия программы - 0.0.8, дата создания 18.11.2025, редактура от 08.06.2026");
         }
+
         public IScenario GetScenario(ScenarioType scenarioType)
         {
             var scenario = _scenarios.FirstOrDefault(s => s.CanHandle(scenarioType));
@@ -387,9 +411,9 @@ namespace OtusTest3.Core.TelegramBot
                     $"Сценарий для типа '{scenarioType}' не найден. " +
                     $"Доступные сценарии: {availableScenarios}");
             }
-
             return scenario;
         }
+
         public async Task ProcessScenario(ITelegramBotClient botClient, ScenarioContext context, Update update, CancellationToken ct)
         {
             IScenario scenario = GetScenario(context.CurrentScenario);
@@ -400,26 +424,28 @@ namespace OtusTest3.Core.TelegramBot
             else
                 await _contextRepository.SetContext(update.Message.From.Id, context, ct);
         }
+
         private static async Task SendMainKeyboard(ITelegramBotClient bot, long chatId, string text, CancellationToken ct)
         {
             var keyboard = new ReplyKeyboardMarkup(
                 new List<KeyboardButton[]>
                 {
-                new KeyboardButton[]
-                {
-                    new KeyboardButton("/show"),
-                    new KeyboardButton("/addtask"),
-                },
-                new KeyboardButton[]
-                {
-                    new KeyboardButton("/report")
-                }
+                    new KeyboardButton[]
+                    {
+                        new KeyboardButton("/show"),
+                        new KeyboardButton("/addtask"),
+                    },
+                    new KeyboardButton[]
+                    {
+                        new KeyboardButton("/report")
+                    }
                 })
             {
                 ResizeKeyboard = true
             };
             await bot.SendMessage(chatId, text, replyMarkup: keyboard, cancellationToken: ct);
         }
+
         private static async Task SendCancelKeyboard(ITelegramBotClient bot, long chatId, string text, CancellationToken ct)
         {
             var keyboard = new ReplyKeyboardMarkup(new KeyboardButton("/cancel"))
