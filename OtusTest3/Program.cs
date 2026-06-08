@@ -1,4 +1,4 @@
-﻿using OtusTest3.Core.DataAccess;
+using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Exeptions;
 using OtusTest3.Core.Infrastructure.DataAccess;
 using OtusTest3.Core.Services;
@@ -17,28 +17,29 @@ namespace OtusTest3
         private static async Task Main(string[] args)
         {
             ArgumentNullException.ThrowIfNull(args);
-            //Задаю макс кол-во задач, считываю, идет преобразование.
             try
             {
                 CancellationTokenSource sourceToken = new CancellationTokenSource();
                 CancellationToken token = sourceToken.Token;
 
                 var botClient = new TelegramBotClient("Token");
-                var userRepo = new FileUserRepository("data/users"); // директория пользователей
-                var toDoRepo = new FileToDoRepository("data/todos"); // директория работы с фалами
+                var userRepo = new FileUserRepository("data/users");
+                var toDoRepo = new FileToDoRepository("data/todos");
 
                 UserService userService = new UserService(userRepo);
                 ToDoReportService toDoReportService = new ToDoReportService(toDoRepo);
                 ToDoService toDoService = new(toDoRepo);
-                ToDoListService toDoListService = new ToDoListService();
+                ToDoListService toDoListService = new ToDoListService(toDoService);
 
                 var scenarios = new List<IScenario>
                 {
-                     new AddTaskScenario(userService, toDoService, toDoListService),    // Передаём сервисы
+                    new AddTaskScenario(userService, toDoService, toDoListService),
+                    new AddListScenario(userService, toDoListService),
+                    new DeleteListScenario(userService, toDoListService),
+                    new ShowTasksScenario(toDoService, userService),
                 };
-       
 
-                InMemoryScenarioContextRepository contextRepo = new ();
+                InMemoryScenarioContextRepository contextRepo = new();
                 var updateHandler = new UpdateHandler(
                             userService,
                             toDoService,
@@ -49,12 +50,12 @@ namespace OtusTest3
 
                 var receiverOptions = new ReceiverOptions
                 {
-                    AllowedUpdates = [UpdateType.Message],
+                    AllowedUpdates = [UpdateType.Message, UpdateType.CallbackQuery],
                     DropPendingUpdates = true
                 };
 
                 botClient.StartReceiving(updateHandler.HandleUpdateAsync, updateHandler.HandleErrorAsync, receiverOptions, token);
-                 var me = await botClient.GetMe();
+                var me = await botClient.GetMe();
                 Console.WriteLine($"{me.FirstName} запущен!");
                 Console.WriteLine("Нажмите А чтобы остановиться");
                 if (Console.ReadLine() == "A")
@@ -62,30 +63,22 @@ namespace OtusTest3
                     sourceToken.Cancel();
                     Environment.Exit(0);
                 }
-                await Task.Delay(-1); // Устанавливаем бесконечную задержку
-
+                await Task.Delay(-1);
             }
-            // Когда статический конструктор класса падает с ошибкой
             catch (TypeInitializationException ex)
             {
                 Console.WriteLine($"Произошла непредвиденная ошибка {ex.Message}");
                 Console.WriteLine($"StackTrace:\n{ex.StackTrace}");
                 if (ex.InnerException != null)
-                {
                     Console.WriteLine("Inner exception: {0}", ex.InnerException);
-                }
             }
-            //Когда экземпляр не инициализирован, когда не написал new() в MyApp myapp = new();
             catch (ArgumentNullException ex)
             {
                 Console.WriteLine($"Произошла непредвиденная ошибка {ex.Message}");
                 Console.WriteLine($"StackTrace:\n{ex.StackTrace}");
                 if (ex.InnerException != null)
-                {
                     Console.WriteLine("Inner exception: {0}", ex.InnerException);
-                }
             }
-            //Когда экземпляр написан не верно(?)
             catch (ArgumentException ex)
             {
                 Console.WriteLine($"Произошла непредвиденная ошибка {ex.Message}");
@@ -108,11 +101,8 @@ namespace OtusTest3
                 Console.WriteLine($"Произошла непредвиденная ошибка:{ex.GetType().Name}");
                 Console.WriteLine($"StackTrace:\n{ex.StackTrace}");
                 if (ex.InnerException != null)
-                {
                     Console.WriteLine("Inner exception: {0}", ex.InnerException);
-                }
             }
         }
-       
-    }   
+    }
 }
