@@ -10,12 +10,17 @@ namespace OtusTest3.Core.Entities
                             // Хранит информацию о списке задач, включая его название, владельца и дату создания. 
                             // Список может содержать несколько задач (ToDoItem), которые принадлежат этому списку.
     {
-        public ToDoList(Guid Id, string Name, Guid userId) // Конструктор - данные по умолчанию, или чтобы не забыть
+        public ToDoList(Guid id, string name, Guid userId)
         {
-            Id = Guid.NewGuid();
-            Name = "Shablon";
-            UserId = userId;
+            // Используем this. чтобы присваивать полям, а не параметрам
+            this.Id = id;
+            this.Name = name;
+            this.UserId = userId;
+            this.CreatedAt = DateTime.UtcNow;
         }
+
+        // Пустой конструктор для десериализации JSON
+        public ToDoList() { }
         public Guid Id { get; set; } //Уникальный идентификатор списка
         public string? Name { get; set; } //Название списка (опционально, может быть пустым)
         public ToDoUser? User { get; set; } //Владелец списка (опционально, может быть null, если список не привязан к конкретному пользователю)
