@@ -325,11 +325,12 @@ namespace OtusTest3.Core.TelegramBot
         {
             var rows = new List<IEnumerable<InlineKeyboardButton>>();
 
-            var noListCallback = new ToDoListCallbackDto
+            var noListCallbackDto = new ToDoListCallbackDto
             {
                 Action = "show",
                 ToDoListId = Guid.Empty
-            }.ToString();
+            };
+            var noListCallback = ToDoListCallbackDto.ToString(noListCallbackDto);
 
             rows.Add(
             [
