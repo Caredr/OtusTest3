@@ -80,6 +80,19 @@ namespace OtusTest3.Core.Services
             TasksLimit(tasksCountstext);
 
         }
+        public async Task<IReadOnlyList<ToDoList>> GetListsByUserId(Guid userId, CancellationToken ct)
+        {
+            // Читаем все задачи из файлов и собираем уникальные списки
+            var allItems = await _iToDoRepository.GetAllByUserId(userId, ct);
+            var lists = allItems
+                .Where(i => i.List is not null)
+                .Select(i => i.List!)
+                .GroupBy(l => l.Id)
+                .Select(g => g.First())
+                .ToList();
+            return lists.AsReadOnly();
+        }
+
         public async Task<IReadOnlyList<ToDoItem>> GetByUserIdAndList(Guid userId, Guid? listId, CancellationToken ct)
         {
             var allItems = await _iToDoRepository.GetActiveByUserId(userId, ct);
