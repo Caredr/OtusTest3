@@ -98,7 +98,8 @@ namespace OtusTest3.Core.TelegramBot
                         break;
                     case "/show":
                         {
-                            var lists = await _iToDoListService.GetUserListsAsync(toDoUser.UserId, ct);
+                            // Читаем списки прямо из файлов задач — они всегда актуальны
+                            var lists = await _iToDoService.GetListsByUserId(toDoUser.UserId, ct);
                             var keyboard = BuildShowListsKeyboard(lists);
 
                             await botClient.SendMessage(
