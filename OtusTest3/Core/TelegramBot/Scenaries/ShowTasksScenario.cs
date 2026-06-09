@@ -1,9 +1,7 @@
 using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
-using OtusTest3.Core.TelegramBot.Dto;
 using Telegram.Bot;
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
 
 namespace OtusTest3.Core.TelegramBot.Scenaries
 {
@@ -30,7 +28,6 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
             Update update,
             CancellationToken ct)
         {
-            // Получаем chatId и userId из любого типа обновления
             long chatId;
             long telegramUserId;
 
@@ -49,7 +46,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                 return ScenarioResult.Completed;
             }
 
-            // Достаём ToDoUser из контекста или загружаем
+            // Загружаем пользователя если нет в контексте
             if (context.Context is not ToDoUser user)
             {
                 user = await _userService.GetUserAsync(telegramUserId, ct)
@@ -59,7 +56,8 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
 
             // Достаём выбранный список из контекста
             Guid? listId = null;
-            if (context.Data.TryGetValue("SelectedListId", out var listIdObj) && listIdObj is Guid lid && lid != Guid.Empty)
+            if (context.Data.TryGetValue("SelectedListId", out var listIdObj)
+                && listIdObj is Guid lid && lid != Guid.Empty)
                 listId = lid;
 
             string listName = context.Data.TryGetValue("SelectedListName", out var nameObj) && nameObj is string n
@@ -69,64 +67,37 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
             // Загружаем задачи
             var tasks = await _todoService.GetByUserIdAndList(user.UserId, listId, ct);
 
+            string message;
+
             if (tasks.Count == 0)
             {
-                await bot.SendMessage(
-                    chatId,
-                    $"📋 *{EscapeMarkdown(listName)}*\n\nЗадач пока нет.",
-                    parseMode: ParseMode.MarkdownV2,
-                    cancellationToken: ct);
+                message = $"Список: {listName}\n\nЗадач пока нет.";
             }
             else
             {
-                var lines = new System.Text.StringBuilder();
-                lines.AppendLine($"📋 *{EscapeMarkdown(listName)}* — {tasks.Count} задач(и):\n");
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"Список: {listName} ({tasks.Count} задач(и))");
+                sb.AppendLine();
 
                 int idx = 1;
                 foreach (var task in tasks)
                 {
-                    string stateIcon = task.State == ToDoItemState.Active ? "🔲" : "✅";
-                    string deadlineStr = task.DeadLine.HasValue && task.DeadLine.Value != DateTime.MaxValue
-                        ? $"📅 `{task.DeadLine.Value:dd.MM.yyyy}`"
+                    string state = task.State == ToDoItemState.Active ? "[ ]" : "[x]";
+
+                    string deadline = task.DeadLine.HasValue
+                        ? $"  до {task.DeadLine.Value:dd.MM.yyyy}"
                         : string.Empty;
 
-                    lines.AppendLine($"{idx}\\. {stateIcon} *{EscapeMarkdown(task.Name)}* {deadlineStr}");
+                    sb.AppendLine($"{idx}. {state} {task.Name}{deadline}");
                     idx++;
                 }
 
-                await bot.SendMessage(
-                    chatId,
-                    lines.ToString(),
-                    parseMode: ParseMode.MarkdownV2,
-                    cancellationToken: ct);
+                message = sb.ToString();
             }
 
-            // Сценарий завершён сразу — просмотр не требует шагов
-            return ScenarioResult.Completed;
-        }
+            await bot.SendMessage(chatId, message, cancellationToken: ct);
 
-        private static string EscapeMarkdown(string text)
-        {
-            // Экранируем спецсимволы MarkdownV2
-            return text
-                .Replace("_", "\\_")
-                .Replace("*", "\\*")
-                .Replace("[", "\\[")
-                .Replace("]", "\\]")
-                .Replace("(", "\\(")
-                .Replace(")", "\\)")
-                .Replace("~", "\\~")
-                .Replace("`", "\\`")
-                .Replace(">", "\\>")
-                .Replace("#", "\\#")
-                .Replace("+", "\\+")
-                .Replace("-", "\\-")
-                .Replace("=", "\\=")
-                .Replace("|", "\\|")
-                .Replace("{", "\\{")
-                .Replace("}", "\\}")
-                .Replace(".", "\\.")
-                .Replace("!", "\\!");
+            return ScenarioResult.Completed;
         }
     }
 }
