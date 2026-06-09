@@ -29,7 +29,8 @@ namespace OtusTest3
                 UserService userService = new UserService(userRepo);
                 ToDoReportService toDoReportService = new ToDoReportService(toDoRepo);
                 ToDoService toDoService = new(toDoRepo);
-                ToDoListService toDoListService = new ToDoListService(toDoService);
+                var toDoListRepo = new FileToDoListRepository("data");
+                ToDoListService toDoListService = new ToDoListService(toDoListRepo, toDoService);
 
                 var scenarios = new List<IScenario>
                 {
