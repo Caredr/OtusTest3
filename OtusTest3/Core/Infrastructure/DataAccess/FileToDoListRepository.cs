@@ -1,83 +1,86 @@
-﻿using OtusTest3.Core.DataAccess;
+using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace OtusTest3.Core.Infrastructure.DataAccess
 {
-    internal class FileToDoListRepository: IToDoListRepository // Класс для работы с Репозиторием
+    /// <summary>
+    /// Хранит списки задач в файловой системе.
+    /// Каждый список — отдельный JSON-файл: data/lists/{userId}/{listId}.json
+    /// </summary>
+    internal class FileToDoListRepository : IToDoListRepository
     {
-        private readonly string _basePath; // папка для хранения файлов (создается автоматически)
-        private readonly JsonSerializerOptions _options = new() { WriteIndented = true }; //настройки сериализации (отступы для читаемости)
+        private readonly string _basePath;
+        private readonly JsonSerializerOptions _options = new() { WriteIndented = true };
+
         public FileToDoListRepository(string basePath)
         {
-            _basePath = basePath;  // Базовая папка из конструктора
-            Directory.CreateDirectory(_basePath); //Создание директории с фалами (Где они создаются?)
+            _basePath = Path.Combine(basePath, "Lists");
+            Directory.CreateDirectory(_basePath);
         }
-        public Task<string> GetFilePath(Guid Id) => Task.FromResult(Path.Combine(_basePath, $"{Id}.json")); //Возвращает путь./data/{ Id}.json
-        public async Task<ToDoList?> LoadListAsync(Guid Id, CancellationToken ct) // Загружает лист со списком фалов репозитория
+
+        private string GetUserFolder(Guid userId) =>
+            Path.Combine(_basePath, userId.ToString());
+
+        private string GetFilePath(Guid userId, Guid listId) =>
+            Path.Combine(GetUserFolder(userId), $"{listId}.json");
+
+        public async Task Add(ToDoList list, CancellationToken ct)
         {
-            string path = await GetFilePath(Id);
-            if (!File.Exists(path)) return null;
-            await using var stream = File.OpenRead(path);
-            return await JsonSerializer.DeserializeAsync<ToDoList>(stream, _options, ct);
-        }
-        public async Task SaveListAsync(ToDoList list, CancellationToken ct) // Записывает ToDoList → ./data/{list.Id}.json
-        {
-            string path = await GetFilePath(list.Id);
+            var folder = GetUserFolder(list.UserId);
+            Directory.CreateDirectory(folder);
+            var path = GetFilePath(list.UserId, list.Id);
             await using var stream = File.Create(path);
             await JsonSerializer.SerializeAsync(stream, list, _options, ct);
         }
-        public async Task<ToDoList?> Get(Guid id, CancellationToken ct) // Проверяет File.Exists вызывает LoadListAsync
+
+        public async Task<ToDoList?> Get(Guid id, CancellationToken ct)
         {
-            if(!File.Exists(await GetFilePath(id)))
-                return null;
-            return await LoadListAsync(id, ct);
+            foreach (var userFolder in Directory.GetDirectories(_basePath))
+            {
+                var path = Path.Combine(userFolder, $"{id}.json");
+                if (!File.Exists(path)) continue;
+                await using var stream = File.OpenRead(path);
+                return await JsonSerializer.DeserializeAsync<ToDoList>(stream, _options, ct);
+            }
+            return null;
         }
-        public async Task<IReadOnlyList<ToDoList>?> GetByUserId(Guid userId, CancellationToken ct) //O(N) — сканирует все файлы (плохо для масштаба)
+
+        public async Task<IReadOnlyList<ToDoList>> GetByUserId(Guid userId, CancellationToken ct)
         {
             var result = new List<ToDoList>();
-            var files = Directory.GetFiles(_basePath, "*.json"); // Directory.GetFiles("*.json") — находит ВСЕ файлы
-            foreach (string file in files) 
+            var folder = GetUserFolder(userId);
+            if (!Directory.Exists(folder))
+                return result.AsReadOnly();
+            foreach (var file in Directory.GetFiles(folder, "*.json"))
             {
-                ct.ThrowIfCancellationRequested(); // ct.ThrowIfCancellationRequested() — проверка отмены
-                if (Guid.TryParse(Path.GetFileNameWithoutExtension(file), out Guid id)) // Парсит Guid из имени файла
-                {
-                    ToDoList? list = await LoadListAsync(id, ct); //Загружает ToDoList
-                    if (list?.User?.UserId == userId) //Проверяет list.User.UserId == userId
-                        result.Add(list); //Добавляет в результат
-                }
+                ct.ThrowIfCancellationRequested();
+                await using var stream = File.OpenRead(file);
+                var list = await JsonSerializer.DeserializeAsync<ToDoList>(stream, _options, ct);
+                if (list != null)
+                    result.Add(list);
             }
-            return result;
+            return result.AsReadOnly();
         }
-        public async Task Add(ToDoList list, CancellationToken ct)  //
-        {
-            ArgumentNullException.ThrowIfNull(list); //Валидация 
-            if (list?.User != null && list.User.UserId == Guid.Empty) //Автогенерация UserId если Guid.Empty
-                list.User.UserId = Guid.NewGuid();
-            await SaveListAsync(list, ct); //Сохраняет через SaveListAsync
-        }
+
         public async Task Delete(Guid id, CancellationToken ct)
         {
-            string path = await GetFilePath(id); //File.Delete — удаляет ./data/{id}.json
-            if (File.Exists(path)) // Безопасно: если файла нет — игнорирует
-                File.Delete(path);
+            foreach (var userFolder in Directory.GetDirectories(_basePath))
+            {
+                var path = Path.Combine(userFolder, $"{id}.json");
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    return;
+                }
+            }
+            await Task.CompletedTask;
         }
+
         public async Task<bool> ExistsByName(Guid userId, string name, CancellationToken ct)
         {
-            ArgumentNullException.ThrowIfNull(name);  
-            var lists = await GetByUserId(userId, ct); // GetByUserId(userId) — загружает ВСЕ списки пользователя
-            foreach (var list in lists) // foreach список: проверяет Name (без учета регистра)
-            {
-                if (string.Equals(list.Name, name, StringComparison.OrdinalIgnoreCase))
-                    return true; //  Возвращает true если найден
-            }
-            return false;
+            var lists = await GetByUserId(userId, ct);
+            return lists.Any(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));
         }
     }
 }
