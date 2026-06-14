@@ -434,7 +434,9 @@ namespace OtusTest3.Core.TelegramBot
                     }
                 })
             {
-                ResizeKeyboard = true
+                ResizeKeyboard = true,
+                // Клавиатура остаётся видимой после нажатия любой кнопки
+                IsPersistent = true
             };
             await bot.SendMessage(chatId, text, replyMarkup: keyboard, cancellationToken: ct);
         }
