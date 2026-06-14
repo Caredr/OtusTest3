@@ -76,11 +76,20 @@ namespace OtusTest3.Core.TelegramBot
                 var userId = update.Message?.From?.Id ?? update.CallbackQuery?.From?.Id;
                 if (userId == null)
                     return;
+                if (commandAccess)
+                {
+                    await SendMainKeyboard(botClient, update.Message.From.Id, update.Message.From.Username, ct);
+                }
                 switch (commandEater)
                 {
                     case "/start":
                         await StartPanel(botClient, update, ct);
                         await SendMainKeyboard(botClient, update.Message.Chat.Id, "Главное меню:", ct);
+                        if (commandAccess == true)
+                        {
+                            await botClient.SendMessage(update.Message.Chat, "старт дан, commandAccess = true");
+                            return;
+                        }
                         break;
                     case "Menu":
                         await botClient.SendMessage(update.Message.Chat, "Доступные команды /start, "  +
@@ -434,9 +443,7 @@ namespace OtusTest3.Core.TelegramBot
                     }
                 })
             {
-                ResizeKeyboard = true,
-                // Клавиатура остаётся видимой после нажатия любой кнопки
-                IsPersistent = true
+                ResizeKeyboard = true
             };
             await bot.SendMessage(chatId, text, replyMarkup: keyboard, cancellationToken: ct);
         }
