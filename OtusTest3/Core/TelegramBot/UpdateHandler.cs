@@ -137,6 +137,15 @@ namespace OtusTest3.Core.TelegramBot
                             await ProcessScenario(botClient, context, update, ct);
                             break;
                         }
+                    case "/deletetask":
+                        {
+                            context = new ScenarioContext(ScenarioType.DeleteTask);
+                            context.Context = toDoUser;
+                            await _contextRepository.SetContext(update.Message.From.Id, context, ct);
+                            await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите /cancel для отмены.", ct);
+                            await RunScenarioWithKeyboard(botClient, context, update, ct);
+                            break;
+                        }
                     case "addlist":
                         {
                             context = new ScenarioContext(ScenarioType.AddList);
@@ -301,7 +310,83 @@ namespace OtusTest3.Core.TelegramBot
                 return;
             }
 
-            // 4) Просмотр задач выбранного списка (show|{listId})
+            // 4) DeleteTask: выбор списка
+            if (callbackData.StartsWith("deletetask_list"))
+            {
+                var context2 = await _contextRepository.GetContext(userId, ct);
+                if (context2?.CurrentScenario == ScenarioType.DeleteTask)
+                {
+                    var dto = ToDoListCallbackDto.FromString(callbackData);
+                    context2.Data["SelectedListId"] = dto.ToDoListId;
+                    context2.CurrentStep = "SelectList";
+                    await _contextRepository.SetContext(userId, context2, ct);
+                    var sc = GetScenario(ScenarioType.DeleteTask);
+                    var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
+                    if (res == ScenarioResult.Completed)
+                    {
+                        await _contextRepository.ResetContext(userId, ct);
+                        await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
+                    }
+                    else
+                        await _contextRepository.SetContext(userId, context2, ct);
+                }
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            // 4b) DeleteTask: выбор конкретной задачи
+            if (callbackData.StartsWith("deletetask_item"))
+            {
+                var context2 = await _contextRepository.GetContext(userId, ct);
+                if (context2?.CurrentScenario == ScenarioType.DeleteTask)
+                {
+                    var dto = ToDoListCallbackDto.FromString(callbackData);
+                    context2.Data["SelectedTaskId"] = dto.ToDoListId; // переиспользуем поле Id
+                    // Ищем имя задачи по Id
+                    var toDoUser2 = context2.Context as ToDoUser;
+                    if (toDoUser2 != null)
+                    {
+                        var allTasks = await _iToDoService.GetAllByUserIdAsync(toDoUser2.UserId, ct);
+                        var task = allTasks.FirstOrDefault(t => t.Id == dto.ToDoListId);
+                        context2.Data["SelectedTaskName"] = task?.Name ?? "задача";
+                    }
+                    context2.CurrentStep = "SelectTask";
+                    await _contextRepository.SetContext(userId, context2, ct);
+                    var sc = GetScenario(ScenarioType.DeleteTask);
+                    var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
+                    if (res == ScenarioResult.Completed)
+                    {
+                        await _contextRepository.ResetContext(userId, ct);
+                        await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
+                    }
+                    else
+                        await _contextRepository.SetContext(userId, context2, ct);
+                }
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            // 4c) DeleteTask: подтверждение yes/no
+            if (callbackData == "deletetask_yes" || callbackData == "deletetask_no")
+            {
+                var context2 = await _contextRepository.GetContext(userId, ct);
+                if (context2?.CurrentScenario == ScenarioType.DeleteTask)
+                {
+                    var sc = GetScenario(ScenarioType.DeleteTask);
+                    var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
+                    if (res == ScenarioResult.Completed)
+                    {
+                        await _contextRepository.ResetContext(userId, ct);
+                        await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
+                    }
+                    else
+                        await _contextRepository.SetContext(userId, context2, ct);
+                }
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            // 5) Просмотр задач выбранного списка (show|{listId})
             if (callbackData.StartsWith("show"))
             {
                 var toDoUser = await _userService.GetUserAsync(userId, ct)
