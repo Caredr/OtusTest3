@@ -38,6 +38,7 @@ namespace OtusTest3
                     new AddListScenario(userService, toDoListService),
                     new DeleteListScenario(userService, toDoListService),
                     new ShowTasksScenario(toDoService, userService),
+                    new DeleteTaskScenario(userService, toDoService, toDoListService),
                 };
 
                 InMemoryScenarioContextRepository contextRepo = new();
