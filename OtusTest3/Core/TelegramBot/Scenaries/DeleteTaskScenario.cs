@@ -1,5 +1,6 @@
-using OtusTest3.Core.DataAccess;
+﻿using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
+using OtusTest3.Core.Services;
 using OtusTest3.Core.TelegramBot.Dto;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -7,10 +8,6 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace OtusTest3.Core.TelegramBot.Scenaries
 {
-    /// <summary>
-    /// Сценарий удаления задачи.
-    /// Шаги: выбор списка → выбор задачи → подтверждение → удаление.
-    /// </summary>
     internal class DeleteTaskScenario : IScenario
     {
         private readonly IUserService _userService;
@@ -45,7 +42,6 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                                ?? update.Message?.From?.Id
                                ?? 0;
 
-            // Загружаем пользователя
             if (context.Context is not ToDoUser user)
             {
                 user = await _userService.GetUserAsync(telegramUserId, ct)
@@ -55,120 +51,114 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
 
             switch (context.CurrentStep)
             {
-                // Шаг 0: показываем inline-клавиатуру со списками
                 case null:
-                {
-                    var lists = await _todoListService.GetUserListsAsync(user.UserId, ct);
-
-                    var rows = new List<IEnumerable<InlineKeyboardButton>>();
-
-                    // Кнопка "Без списка"
-                    var noListDto = new ToDoListCallbackDto { Action = "deletetask_list", ToDoListId = Guid.Empty };
-                    rows.Add(new[] { InlineKeyboardButton.WithCallbackData("📌 Без списка", ToDoListCallbackDto.ToString(noListDto)) });
-
-                    foreach (var list in lists)
                     {
-                        var dto = new ToDoListCallbackDto { Action = "deletetask_list", ToDoListId = list.Id };
-                        var cb = ToDoListCallbackDto.ToString(dto);
-                        if (cb.Length > 64) cb = cb[..64];
-                        rows.Add(new[] { InlineKeyboardButton.WithCallbackData(list.Name ?? "(без имени)", cb) });
+                        var lists = await _todoListService.GetUserListsAsync(user.UserId, ct);
+                        var rows = new List<IEnumerable<InlineKeyboardButton>>();
+
+                        var noListDto = new ToDoListCallbackDto { Action = "deletetask_list", ToDoListId = Guid.Empty };
+                        rows.Add(new[] { InlineKeyboardButton.WithCallbackData("📌 Без списка", ToDoListCallbackDto.ToString(noListDto)) });
+
+                        foreach (var list in lists)
+                        {
+                            var dto = new ToDoListCallbackDto { Action = "deletetask_list", ToDoListId = list.Id };
+                            var cb = ToDoListCallbackDto.ToString(dto);
+                            if (cb.Length > 64) cb = cb[..64];
+                            rows.Add(new[] { InlineKeyboardButton.WithCallbackData(list.Name ?? "(без имени)", cb) });
+                        }
+
+                        await bot.SendMessage(chatId,
+                            "Выберите список задачи для удаления:",
+                            replyMarkup: new InlineKeyboardMarkup(rows),
+                            cancellationToken: ct);
+
+                        context.CurrentStep = "SelectList";
+                        return ScenarioResult.Transition;
                     }
 
-                    await bot.SendMessage(chatId,
-                        "Выберите список задачи для удаления:",
-                        replyMarkup: new InlineKeyboardMarkup(rows),
-                        cancellationToken: ct);
-
-                    context.CurrentStep = "SelectList";
-                    return ScenarioResult.Transition;
-                }
-
-                // Шаг 1: показываем задачи выбранного списка
                 case "SelectList":
-                {
-                    if (!context.Data.TryGetValue("SelectedListId", out var lidObj) || lidObj is not Guid listId)
+                    {
+                        if (!context.Data.TryGetValue("SelectedListId", out var lidObj) || lidObj is not Guid listId)
+                            return ScenarioResult.Transition;
+
+                        Guid? nullableListId = listId == Guid.Empty ? null : listId;
+                        var tasks = await _todoService.GetByUserIdAndList(user.UserId, nullableListId, ct);
+
+                        if (tasks.Count == 0)
+                        {
+                            await bot.SendMessage(chatId, "В этом списке нет задач.", cancellationToken: ct);
+                            context.CurrentStep = null;
+                            return ScenarioResult.Completed;
+                        }
+
+                        var rows = new List<IEnumerable<InlineKeyboardButton>>();
+                        foreach (var task in tasks)
+                        {
+                            string state = task.State == ToDoItemState.Active ? "[ ]" : "[x]";
+                            string label = $"{state} {task.Name}";
+                            if (label.Length > 40) label = label[..40];
+
+                            var dto = new ToDoListCallbackDto { Action = "deletetask_item", ToDoListId = task.Id };
+                            var cb = ToDoListCallbackDto.ToString(dto);
+                            if (cb.Length > 64) cb = cb[..64];
+                            rows.Add(new[] { InlineKeyboardButton.WithCallbackData(label, cb) });
+                        }
+
+                        await bot.SendMessage(chatId,
+                            "Выберите задачу для удаления:",
+                            replyMarkup: new InlineKeyboardMarkup(rows),
+                            cancellationToken: ct);
+
+                        context.CurrentStep = "SelectTask";
                         return ScenarioResult.Transition;
-
-                    Guid? nullableListId = listId == Guid.Empty ? null : listId;
-                    var tasks = await _todoService.GetByUserIdAndList(user.UserId, nullableListId, ct);
-
-                    if (tasks.Count == 0)
-                    {
-                        await bot.SendMessage(chatId, "В этом списке нет задач.", cancellationToken: ct);
-                        context.CurrentStep = null;
-                        return ScenarioResult.Completed;
                     }
 
-                    var rows = new List<IEnumerable<InlineKeyboardButton>>();
-                    foreach (var task in tasks)
-                    {
-                        string state = task.State == ToDoItemState.Active ? "[ ]" : "[x]";
-                        string label = $"{state} {task.Name}";
-                        if (label.Length > 40) label = label[..40];
-
-                        var dto = new ToDoListCallbackDto { Action = "deletetask_item", ToDoListId = task.Id };
-                        var cb = ToDoListCallbackDto.ToString(dto);
-                        if (cb.Length > 64) cb = cb[..64];
-                        rows.Add(new[] { InlineKeyboardButton.WithCallbackData(label, cb) });
-                    }
-
-                    await bot.SendMessage(chatId,
-                        "Выберите задачу для удаления:",
-                        replyMarkup: new InlineKeyboardMarkup(rows),
-                        cancellationToken: ct);
-
-                    context.CurrentStep = "SelectTask";
-                    return ScenarioResult.Transition;
-                }
-
-                // Шаг 2: подтверждение удаления
                 case "SelectTask":
-                {
-                    if (!context.Data.TryGetValue("SelectedTaskId", out var tidObj) || tidObj is not Guid taskId)
-                        return ScenarioResult.Transition;
-
-                    string taskName = context.Data.TryGetValue("SelectedTaskName", out var nameObj) && nameObj is string n
-                        ? n : "задачу";
-
-                    var keyboard = new InlineKeyboardMarkup(new[]
                     {
+                        if (!context.Data.TryGetValue("SelectedTaskId", out var tidObj) || tidObj is not Guid taskId)
+                            return ScenarioResult.Transition;
+
+                        string taskName = context.Data.TryGetValue("SelectedTaskName", out var nameObj) && nameObj is string n
+                            ? n : "задачу";
+
+                        var keyboard = new InlineKeyboardMarkup(new[]
+                        {
                         InlineKeyboardButton.WithCallbackData("✅ Да", "deletetask_yes"),
                         InlineKeyboardButton.WithCallbackData("❌ Нет", "deletetask_no")
                     });
 
-                    await bot.SendMessage(chatId,
-                        $"Удалить задачу \"{taskName}\"?",
-                        replyMarkup: keyboard,
-                        cancellationToken: ct);
+                        await bot.SendMessage(chatId,
+                            $"Удалить задачу \"{taskName}\"?",
+                            replyMarkup: keyboard,
+                            cancellationToken: ct);
 
-                    context.CurrentStep = "Confirm";
-                    return ScenarioResult.Transition;
-                }
+                        context.CurrentStep = "Confirm";
+                        return ScenarioResult.Transition;
+                    }
 
-                // Шаг 3: выполняем удаление
                 case "Confirm":
-                {
-                    var cbData = update.CallbackQuery?.Data ?? string.Empty;
-
-                    if (cbData == "deletetask_yes")
                     {
-                        if (context.Data.TryGetValue("SelectedTaskId", out var tidObj) && tidObj is Guid taskId)
+                        var cbData = update.CallbackQuery?.Data ?? string.Empty;
+
+                        if (cbData == "deletetask_yes")
                         {
-                            await _todoService.DeleteAsync(taskId, ct);
-                            string taskName = context.Data.TryGetValue("SelectedTaskName", out var n) && n is string name
-                                ? name : "Задача";
-                            await bot.SendMessage(chatId, $"✅ \"{taskName}\" удалена.", cancellationToken: ct);
+                            if (context.Data.TryGetValue("SelectedTaskId", out var tidObj) && tidObj is Guid taskId)
+                            {
+                                await _todoService.DeleteAsync(taskId, ct);
+                                string taskName = context.Data.TryGetValue("SelectedTaskName", out var n) && n is string name
+                                    ? name : "Задача";
+                                await bot.SendMessage(chatId, $"✅ \"{taskName}\" удалена.", cancellationToken: ct);
+                            }
                         }
-                    }
-                    else
-                    {
-                        await bot.SendMessage(chatId, "Удаление отменено.", cancellationToken: ct);
-                    }
+                        else
+                        {
+                            await bot.SendMessage(chatId, "Удаление отменено.", cancellationToken: ct);
+                        }
 
-                    context.CurrentStep = null;
-                    context.Data.Clear();
-                    return ScenarioResult.Completed;
-                }
+                        context.CurrentStep = null;
+                        context.Data.Clear();
+                        return ScenarioResult.Completed;
+                    }
 
                 default:
                     context.CurrentStep = null;

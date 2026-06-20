@@ -256,6 +256,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
 
             // Получаем ToDoList по Guid из FileToDoListRepository
             ToDoList? list = null;
+            
             if (dto.ToDoListId != Guid.Empty)
             {
                 list = await _todoListService.GetAsync(dto.ToDoListId, ct);

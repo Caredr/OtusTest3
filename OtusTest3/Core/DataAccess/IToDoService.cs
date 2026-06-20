@@ -28,5 +28,6 @@ namespace OtusTest3.Core.DataAccess
 
         // Возвращает уникальные ToDoList из задач пользователя (читает из файлов, не из памяти)
         Task<IReadOnlyList<ToDoList>> GetListsByUserId(Guid userId, CancellationToken ct);
+        Task<ToDoItem?> Get(Guid toDoItemId, CancellationToken ct);
     }
 }

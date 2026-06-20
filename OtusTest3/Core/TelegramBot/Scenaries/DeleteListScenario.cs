@@ -18,13 +18,11 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
     {
         private readonly IUserService _userService;
         private readonly IToDoListService _todoListService;
-        private readonly IToDoService _todoService;
 
-        public DeleteListScenario(IUserService userService, IToDoListService todoListService, IToDoService todoService)
+        public DeleteListScenario(IUserService userService, IToDoListService todoListService)
         {
             _userService = userService;
             _todoListService = todoListService;
-            _todoService = todoService;
         }
         public bool CanHandle(ScenarioType scenario)
         {
