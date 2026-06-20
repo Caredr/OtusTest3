@@ -23,6 +23,12 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IToDoListService _iToDoListService;
         private readonly int commandDataMaxLenght = 64;
 
+        /// <summary>
+        /// true  — полный доступ ко всем командам.
+        /// false — доступны только /start, /help, /report.
+        /// </summary>
+        private bool commandAccess = true;
+
         public UpdateHandler(
             IUserService userService,
             IToDoService iToDoService,
@@ -76,6 +82,23 @@ namespace OtusTest3.Core.TelegramBot
                 var userId = update.Message?.From?.Id ?? update.CallbackQuery?.From?.Id;
                 if (userId == null)
                     return;
+
+                // Если доступ ограничен — пропускаем только /start, /help, /report
+                if (!commandAccess)
+                {
+                    bool allowed = commandEater == "/start"
+                               || commandEater == "/help"
+                               || commandEater == "/report";
+                    if (!allowed)
+                    {
+                        await botClient.SendMessage(
+                            update.Message.Chat.Id,
+                            "Доступ ограничен. Доступны команды: /start, /help, /report",
+                            cancellationToken: ct);
+                        return;
+                    }
+                }
+
                 switch (commandEater)
                 {
                     case "/start":
