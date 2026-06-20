@@ -93,6 +93,11 @@ namespace OtusTest3.Core.Services
             return lists.AsReadOnly();
         }
 
+        public async Task<ToDoItem?> Get(Guid toDoItemId, CancellationToken ct)
+        {
+            return await _iToDoRepository.Get(toDoItemId, ct);
+        }
+
         public async Task<IReadOnlyList<ToDoItem>> GetByUserIdAndList(Guid userId, Guid? listId, CancellationToken ct)
         {
             var allItems = await _iToDoRepository.GetActiveByUserId(userId, ct);

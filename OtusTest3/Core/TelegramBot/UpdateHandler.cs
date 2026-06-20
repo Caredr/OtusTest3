@@ -39,7 +39,7 @@ namespace OtusTest3.Core.TelegramBot
             _iToDoListService = iToDoListService;
         }
 
-        private bool commandAccess = true;
+
 
         public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
@@ -76,10 +76,6 @@ namespace OtusTest3.Core.TelegramBot
                 var userId = update.Message?.From?.Id ?? update.CallbackQuery?.From?.Id;
                 if (userId == null)
                     return;
-                if (commandAccess)
-                {
-                    await SendMainKeyboard(botClient, update.Message.From.Id, update.Message.From.Username, ct);
-                }
                 switch (commandEater)
                 {
                     case "/start":
@@ -178,33 +174,49 @@ namespace OtusTest3.Core.TelegramBot
                                 await _contextRepository.SetContext(update.Message.From.Id, context, ct);
                             break;
                         }
-                    case string s when s.StartsWith("/removetask") && commandAccess == true:
+                    case string s when s.StartsWith("/removetask"):
                         {
-                            if (Guid.TryParse(commandEater, out taskId))
+                            // Извлекаем Guid из подстроки после "/removetask "
+                            var idPart = commandEater.Length > "/removetask ".Length
+                                ? commandEater["/removetask ".Length..].Trim()
+                                : string.Empty;
+                            if (Guid.TryParse(idPart, out taskId))
                             {
                                 await _iToDoService.DeleteAsync(taskId, ct);
-                                await botClient.SendMessage(update.Message.Chat, "Задача удалена");
+                                await botClient.SendMessage(update.Message.Chat, "Задача удалена", cancellationToken: ct);
                             }
                             else
                             {
-                                await botClient.SendMessage(update.Message.Chat, "Некорректный идентификатор задачи");
+                                await botClient.SendMessage(update.Message.Chat,
+                                    "Некорректный идентификатор. Используйте: /removetask <guid>",
+                                    cancellationToken: ct);
                             }
                             break;
                         }
-                    case "/deletetask":
+                    case string si when si.StartsWith("/find"):
                         {
-                            context = new ScenarioContext(ScenarioType.DeleteTask);
-                            context.Context = toDoUser;
-                            await _contextRepository.SetContext(update.Message.From.Id, context, ct);
-                            await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите /cancel для отмены.", ct);
-                            await RunScenarioWithKeyboard(botClient, context, update, ct);
-                            break;
-                        }
-                    case string si when si.StartsWith("/find") && commandAccess == true:
-                        {
-                            if (Guid.TryParse(commandEater, out taskId))
+                            // Извлекаем префикс после "/find "
+                            var prefix = commandEater.Length > "/find ".Length
+                                ? commandEater["/find ".Length..].Trim()
+                                : string.Empty;
+                            if (string.IsNullOrWhiteSpace(prefix))
                             {
-                                await _iToDoService.FindAsync(toDoUser, commandEater, ct);
+                                await botClient.SendMessage(update.Message.Chat,
+                                    "Укажите слово для поиска. Используйте: /find <текст>",
+                                    cancellationToken: ct);
+                                break;
+                            }
+                            var found = await _iToDoService.FindAsync(toDoUser, prefix, ct);
+                            if (found.Count == 0)
+                            {
+                                await botClient.SendMessage(update.Message.Chat, "Задачи не найдены.", cancellationToken: ct);
+                            }
+                            else
+                            {
+                                var sb = new System.Text.StringBuilder("Найдено:");
+                                foreach (var t in found)
+                                    sb.AppendLine($"\n• {t.Name} [{t.State}]");
+                                await botClient.SendMessage(update.Message.Chat, sb.ToString(), cancellationToken: ct);
                             }
                             break;
                         }
@@ -216,23 +228,6 @@ namespace OtusTest3.Core.TelegramBot
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
-            }
-        }
-        // ✅ ДОБАВЛЕН: новый метод — запускает сценарий и управляет клавиатурой
-        public async Task RunScenarioWithKeyboard(ITelegramBotClient botClient, ScenarioContext context, Update update, CancellationToken ct)
-        {
-            IScenario scenario = GetScenario(context.CurrentScenario);
-            ScenarioResult result = await scenario.HandleMessageAsync(botClient, context, update, ct);
-
-            if (result == ScenarioResult.Completed)
-            {
-                await _contextRepository.ResetContext(update.Message.From.Id, ct);
-                await SendMainKeyboard(botClient, update.Message.Chat.Id, "Главное меню:", ct); // ← возврат главной
-            }
-            else
-            {
-                await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите /cancel для отмены.", ct); // ← напоминание
-                await _contextRepository.SetContext(update.Message.From.Id, context, ct);
             }
         }
         private async Task HandleCallbackQueryAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
@@ -486,7 +481,8 @@ namespace OtusTest3.Core.TelegramBot
 
         public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken ct)
         {
-            throw new NullReferenceException(null, exception);
+            Console.WriteLine($"[TelegramBot ERROR] Source={source}: {exception}");
+            return Task.CompletedTask;
         }
 
         public async Task StartPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
