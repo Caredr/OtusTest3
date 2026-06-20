@@ -312,9 +312,12 @@ namespace OtusTest3.Core.TelegramBot
                     return;
                 }
                 context.Data["SelectedList"] = todoList;
-                await _contextRepository.SetContext(userId, context, ct);
                 var scenario = GetScenario(ScenarioType.DeleteList);
-                await scenario.HandleMessageAsync(botClient, context, update, ct);
+                var res = await scenario.HandleMessageAsync(botClient, context, update, ct);
+                if (res == ScenarioResult.Completed)
+                    await _contextRepository.ResetContext(userId, ct);
+                else
+                    await _contextRepository.SetContext(userId, context, ct); // сохраняем CurrentStep="Delete"
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
@@ -323,15 +326,15 @@ namespace OtusTest3.Core.TelegramBot
             if (context?.CurrentScenario == ScenarioType.DeleteList &&
                 context.CurrentStep == "Delete")
             {
-                var scenario = GetScenario(ScenarioType.DeleteList) as DeleteListScenario;
-                if (scenario != null)
+                var scenario = GetScenario(ScenarioType.DeleteList);
+                var res = await scenario.HandleMessageAsync(botClient, context, update, ct);
+                if (res == ScenarioResult.Completed)
                 {
-                    await scenario.HandleCallbackQueryAsync(botClient, context, callbackQuery, ct);
-                    if (context.CurrentStep == null)
-                        await _contextRepository.ResetContext(userId, ct);
-                    else
-                        await _contextRepository.SetContext(userId, context, ct);
+                    await _contextRepository.ResetContext(userId, ct);
+                    await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
                 }
+                else
+                    await _contextRepository.SetContext(userId, context, ct);
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
