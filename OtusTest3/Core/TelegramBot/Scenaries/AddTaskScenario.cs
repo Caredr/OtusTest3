@@ -62,7 +62,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                             context.Context = user;
                         }
 
-                        var lists = await _todoService.GetListsByUserId(user.UserId, ct);
+                        var lists = await _todoListService.GetUserListsAsync(user.UserId, ct);
 
                         var rows = new List<IEnumerable<InlineKeyboardButton>>();
 
@@ -256,16 +256,10 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
 
             // Получаем ToDoList по Guid из реальных задач файла
             ToDoList? list = null;
+            
             if (dto.ToDoListId != Guid.Empty)
             {
-                // Ищем список из файлов задач пользователя
-                var chatUserId = callbackQuery.From.Id;
-                var todoUser = context.Context as OtusTest3.Core.Entities.ToDoUser;
-                if (todoUser != null)
-                {
-                    var fileLists = await _todoService.GetListsByUserId(todoUser.UserId, ct);
-                    list = fileLists.FirstOrDefault(l => l.Id == dto.ToDoListId);
-                }
+                list = await _todoListService.GetAsync(dto.ToDoListId, ct);
             }
 
             // Сохраняем сам ToDoList (а не Guid), чтобы потом отдать в AddAsync

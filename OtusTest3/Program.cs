@@ -22,22 +22,23 @@ namespace OtusTest3
                 CancellationTokenSource sourceToken = new CancellationTokenSource();
                 CancellationToken token = sourceToken.Token;
 
-                var botClient = new TelegramBotClient("Token");
+                var botClient = new TelegramBotClient("8531549139:AAGbr5w3jVvce4Bj0FvTXItzOXStzKbJn6c");
                 var userRepo = new FileUserRepository("data/users");
                 var toDoRepo = new FileToDoRepository("data/todos");
+                var toDoListRepo = new FileToDoListRepository("data");
 
                 UserService userService = new UserService(userRepo);
                 ToDoReportService toDoReportService = new ToDoReportService(toDoRepo);
                 ToDoService toDoService = new(toDoRepo);
-                var toDoListRepo = new FileToDoListRepository("data");
                 ToDoListService toDoListService = new ToDoListService(toDoListRepo, toDoService);
 
                 var scenarios = new List<IScenario>
                 {
-                    new AddTaskScenario(userService, toDoService, toDoListService),
-                    new AddListScenario(userService, toDoListService),
-                    new DeleteListScenario(userService, toDoListService),
-                    new ShowTasksScenario(toDoService, userService),
+                        new AddTaskScenario(userService, toDoService, toDoListService),
+                        new AddListScenario(userService, toDoListService),
+                        new DeleteListScenario(userService, toDoListService),
+                        new ShowTasksScenario(toDoService, userService),
+                        new DeleteTaskScenario(userService, toDoService, toDoListService), // ← добавлен
                 };
 
                 InMemoryScenarioContextRepository contextRepo = new();

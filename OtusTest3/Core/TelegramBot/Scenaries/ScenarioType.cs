@@ -8,6 +8,6 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
 {
     public enum ScenarioType // типы сценариев
     {
-        None, AddTask, AddList, DeleteList, ShowTasks
+        None, AddTask, AddList, DeleteList, ShowTasks, DeleteTask
     }
 }

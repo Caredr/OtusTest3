@@ -61,12 +61,12 @@ namespace OtusTest3.Core.TelegramBot
                 if (commandEater == "/cancel")
                 {
                     await _contextRepository.ResetContext(update.Message.From.Id, ct);
-                    await SendMainKeyboard(botClient, update.Message.From.Id, update.Message.From.Username, ct);
+                    await SendMainKeyboard(botClient, update.Message.Chat.Id, "Действие отменено.", ct);
                     return;
                 }
                 if (context != null)
                 {
-                    await ProcessScenario(botClient, context, update, ct);
+                    await RunScenarioWithKeyboard(botClient, context, update, ct);
                     return;
                 }
                 if (toDoUser == null)
@@ -85,11 +85,6 @@ namespace OtusTest3.Core.TelegramBot
                     case "/start":
                         await StartPanel(botClient, update, ct);
                         await SendMainKeyboard(botClient, update.Message.Chat.Id, "Главное меню:", ct);
-                        if (commandAccess == true)
-                        {
-                            await botClient.SendMessage(update.Message.Chat, "старт дан, commandAccess = true");
-                            return;
-                        }
                         break;
                     case "Menu":
                         await botClient.SendMessage(update.Message.Chat, "Доступные команды /start, "  +
@@ -132,6 +127,7 @@ namespace OtusTest3.Core.TelegramBot
                             context = new ScenarioContext(ScenarioType.AddTask);
                             context.Context = toDoUser;
                             await _contextRepository.SetContext(update.Message.From.Id, context, ct);
+                            await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Выберите список для задачи:", ct);
                             await ProcessScenario(botClient, context, update, ct);
                             break;
                         }
@@ -140,10 +136,18 @@ namespace OtusTest3.Core.TelegramBot
                             context = new ScenarioContext(ScenarioType.AddList);
                             context.Context = toDoUser;
                             await _contextRepository.SetContext(update.Message.From.Id, context, ct);
-
+                            // ✅ ДОБАВЛЕНО: кнопка /cancel при старте сценария
+                            await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите /cancel для отмены.", ct);
                             var scenario = GetScenario(ScenarioType.AddList);
-                            await scenario.HandleMessageAsync(botClient, context, update, ct);
-                            await _contextRepository.SetContext(update.Message.From.Id, context, ct);
+                            var r = await scenario.HandleMessageAsync(botClient, context, update, ct);
+                            // ✅ ДОБАВЛЕНО: возврат главной клавиатуры после завершения
+                            if (r == ScenarioResult.Completed)
+                            {
+                                await _contextRepository.ResetContext(update.Message.From.Id, ct);
+                                await SendMainKeyboard(botClient, update.Message.Chat.Id, "Готово!", ct);
+                            }
+                            else
+                                await _contextRepository.SetContext(update.Message.From.Id, context, ct);
                             break;
                         }
                     case "deletelist":
@@ -151,10 +155,18 @@ namespace OtusTest3.Core.TelegramBot
                             context = new ScenarioContext(ScenarioType.DeleteList);
                             context.Context = toDoUser;
                             await _contextRepository.SetContext(update.Message.From.Id, context, ct);
-
+                            // ✅ ДОБАВЛЕНО: кнопка /cancel при старте сценария
+                            await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите /cancel для отмены.", ct);
                             var scenario = GetScenario(ScenarioType.DeleteList);
-                            await scenario.HandleMessageAsync(botClient, context, update, ct);
-                            await _contextRepository.SetContext(update.Message.From.Id, context, ct);
+                            var r = await scenario.HandleMessageAsync(botClient, context, update, ct);
+                            // ✅ ДОБАВЛЕНО: возврат главной клавиатуры после завершения
+                            if (r == ScenarioResult.Completed)
+                            {
+                                await _contextRepository.ResetContext(update.Message.From.Id, ct);
+                                await SendMainKeyboard(botClient, update.Message.Chat.Id, "Готово!", ct);
+                            }
+                            else
+                                await _contextRepository.SetContext(update.Message.From.Id, context, ct);
                             break;
                         }
                     case string s when s.StartsWith("/removetask") && commandAccess == true:
@@ -168,6 +180,15 @@ namespace OtusTest3.Core.TelegramBot
                             {
                                 await botClient.SendMessage(update.Message.Chat, "Некорректный идентификатор задачи");
                             }
+                            break;
+                        }
+                    case "/deletetask":
+                        {
+                            context = new ScenarioContext(ScenarioType.DeleteTask);
+                            context.Context = toDoUser;
+                            await _contextRepository.SetContext(update.Message.From.Id, context, ct);
+                            await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите /cancel для отмены.", ct);
+                            await RunScenarioWithKeyboard(botClient, context, update, ct);
                             break;
                         }
                     case string si when si.StartsWith("/find") && commandAccess == true:
@@ -188,7 +209,23 @@ namespace OtusTest3.Core.TelegramBot
                 Console.WriteLine(ex.ToString());
             }
         }
+        // ✅ ДОБАВЛЕН: новый метод — запускает сценарий и управляет клавиатурой
+        public async Task RunScenarioWithKeyboard(ITelegramBotClient botClient, ScenarioContext context, Update update, CancellationToken ct)
+        {
+            IScenario scenario = GetScenario(context.CurrentScenario);
+            ScenarioResult result = await scenario.HandleMessageAsync(botClient, context, update, ct);
 
+            if (result == ScenarioResult.Completed)
+            {
+                await _contextRepository.ResetContext(update.Message.From.Id, ct);
+                await SendMainKeyboard(botClient, update.Message.Chat.Id, "Главное меню:", ct); // ← возврат главной
+            }
+            else
+            {
+                await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите /cancel для отмены.", ct); // ← напоминание
+                await _contextRepository.SetContext(update.Message.From.Id, context, ct);
+            }
+        }
         private async Task HandleCallbackQueryAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             if (update.CallbackQuery == null)
@@ -287,7 +324,82 @@ namespace OtusTest3.Core.TelegramBot
                 return;
             }
 
-            // 4) Просмотр задач выбранного списка (show|{listId})
+            // 4) DeleteTask: выбор списка
+            if (callbackData.StartsWith("deletetask_list"))
+            {
+                var context2 = await _contextRepository.GetContext(userId, ct);
+                if (context2?.CurrentScenario == ScenarioType.DeleteTask)
+                {
+                    var dto = ToDoListCallbackDto.FromString(callbackData);
+                    context2.Data["SelectedListId"] = dto.ToDoListId;
+                    context2.CurrentStep = "SelectList";
+                    await _contextRepository.SetContext(userId, context2, ct);
+                    var sc = GetScenario(ScenarioType.DeleteTask);
+                    var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
+                    if (res == ScenarioResult.Completed)
+                    {
+                        await _contextRepository.ResetContext(userId, ct);
+                        await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
+                    }
+                    else
+                        await _contextRepository.SetContext(userId, context2, ct);
+                }
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            // 4b) DeleteTask: выбор конкретной задачи
+            if (callbackData.StartsWith("deletetask_item"))
+            {
+                var context2 = await _contextRepository.GetContext(userId, ct);
+                if (context2?.CurrentScenario == ScenarioType.DeleteTask)
+                {
+                    var dto = ToDoListCallbackDto.FromString(callbackData);
+                    context2.Data["SelectedTaskId"] = dto.ToDoListId;
+                    var toDoUser2 = context2.Context as ToDoUser;
+                    if (toDoUser2 != null)
+                    {
+                        var allTasks = await _iToDoService.GetAllByUserIdAsync(toDoUser2.UserId, ct);
+                        var task = allTasks.FirstOrDefault(t => t.Id == dto.ToDoListId);
+                        context2.Data["SelectedTaskName"] = task?.Name ?? "задача";
+                    }
+                    context2.CurrentStep = "SelectTask";
+                    await _contextRepository.SetContext(userId, context2, ct);
+                    var sc = GetScenario(ScenarioType.DeleteTask);
+                    var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
+                    if (res == ScenarioResult.Completed)
+                    {
+                        await _contextRepository.ResetContext(userId, ct);
+                        await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
+                    }
+                    else
+                        await _contextRepository.SetContext(userId, context2, ct);
+                }
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            // 4c) DeleteTask: подтверждение yes/no
+            if (callbackData == "deletetask_yes" || callbackData == "deletetask_no")
+            {
+                var context2 = await _contextRepository.GetContext(userId, ct);
+                if (context2?.CurrentScenario == ScenarioType.DeleteTask)
+                {
+                    var sc = GetScenario(ScenarioType.DeleteTask);
+                    var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
+                    if (res == ScenarioResult.Completed)
+                    {
+                        await _contextRepository.ResetContext(userId, ct);
+                        await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
+                    }
+                    else
+                        await _contextRepository.SetContext(userId, context2, ct);
+                }
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            // 5) Просмотр задач выбранного списка (show|{listId})
             if (callbackData.StartsWith("show"))
             {
                 var toDoUser = await _userService.GetUserAsync(userId, ct)
@@ -295,11 +407,9 @@ namespace OtusTest3.Core.TelegramBot
 
                 var dto = ToDoListCallbackDto.FromString(callbackData);
 
-                // Создаём одноразовый контекст для ShowTasksScenario
                 var showContext = new ScenarioContext(ScenarioType.ShowTasks);
                 showContext.Context = toDoUser;
 
-                // Передаём выбранный список
                 if (dto.ToDoListId != Guid.Empty)
                 {
                     var list = await _iToDoListService.GetAsync(dto.ToDoListId, ct);
@@ -443,7 +553,8 @@ namespace OtusTest3.Core.TelegramBot
                     }
                 })
             {
-                ResizeKeyboard = true
+                ResizeKeyboard = true,
+                IsPersistent = true  // ← клавиатура остаётся после нажатия кнопки
             };
             await bot.SendMessage(chatId, text, replyMarkup: keyboard, cancellationToken: ct);
         }
