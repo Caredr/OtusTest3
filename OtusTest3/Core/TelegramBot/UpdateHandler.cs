@@ -131,6 +131,15 @@ namespace OtusTest3.Core.TelegramBot
                             await ProcessScenario(botClient, context, update, ct);
                             break;
                         }
+                    case "/deletetask":
+                        {
+                            context = new ScenarioContext(ScenarioType.DeleteTask);
+                            context.Context = toDoUser;
+                            await _contextRepository.SetContext(update.Message.From.Id, context, ct);
+                            await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите /cancel для отмены.", ct);
+                            await RunScenarioWithKeyboard(botClient, context, update, ct);
+                            break;
+                        }
                     case "addlist":
                         {
                             context = new ScenarioContext(ScenarioType.AddList);
@@ -524,6 +533,27 @@ namespace OtusTest3.Core.TelegramBot
                     $"Доступные сценарии: {availableScenarios}");
             }
             return scenario;
+        }
+
+        /// <summary>
+        /// Запускает сценарий. При завершении возвращает главную клавиатуру.
+        /// </summary>
+        public async Task RunScenarioWithKeyboard(ITelegramBotClient botClient, ScenarioContext context, Update update, CancellationToken ct)
+        {
+            IScenario scenario = GetScenario(context.CurrentScenario);
+            ScenarioResult result = await scenario.HandleMessageAsync(botClient, context, update, ct);
+
+            if (result == ScenarioResult.Completed)
+            {
+                await _contextRepository.ResetContext(update.Message.From.Id, ct);
+                await SendMainKeyboard(botClient, update.Message.Chat.Id, "Главное меню:", ct);
+            }
+            else
+            {
+                // Сценарий ещё идёт — напоминаем про /cancel
+                await SendCancelKeyboard(botClient, update.Message.Chat.Id, "Введите /cancel для отмены.", ct);
+                await _contextRepository.SetContext(update.Message.From.Id, context, ct);
+            }
         }
 
         public async Task ProcessScenario(ITelegramBotClient botClient, ScenarioContext context, Update update, CancellationToken ct)

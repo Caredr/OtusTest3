@@ -254,7 +254,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                 return ScenarioResult.Transition;
             }
 
-            // Получаем ToDoList по Guid из реальных задач файла
+            // Получаем ToDoList по Guid из FileToDoListRepository
             ToDoList? list = null;
             
             if (dto.ToDoListId != Guid.Empty)
