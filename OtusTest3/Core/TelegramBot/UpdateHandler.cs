@@ -410,7 +410,9 @@ namespace OtusTest3.Core.TelegramBot
             if (callbackData == "deletetask_yes" || callbackData == "deletetask_no")
             {
                 var context2 = await _contextRepository.GetContext(userId, ct);
-                if (context2?.CurrentScenario == ScenarioType.DeleteTask)
+                Console.WriteLine($"[4c] CurrentStep={context2?.CurrentStep}, SelectedTaskId={context2?.Data.GetValueOrDefault("SelectedTaskId")}");
+                if (context2?.CurrentScenario == ScenarioType.DeleteTask
+                    && context2.CurrentStep == "Confirm")
                 {
                     var sc = GetScenario(ScenarioType.DeleteTask);
                     var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
@@ -421,6 +423,10 @@ namespace OtusTest3.Core.TelegramBot
                     }
                     else
                         await _contextRepository.SetContext(userId, context2, ct);
+                }
+                else
+                {
+                    Console.WriteLine($"[4c] Пропущено: сценарий={context2?.CurrentScenario}, шаг={context2?.CurrentStep}");
                 }
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;

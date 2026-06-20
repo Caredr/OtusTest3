@@ -123,9 +123,9 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
 
                         var keyboard = new InlineKeyboardMarkup(new[]
                         {
-                        InlineKeyboardButton.WithCallbackData("✅ Да", "deletetask_yes"),
-                        InlineKeyboardButton.WithCallbackData("❌ Нет", "deletetask_no")
-                    });
+                            InlineKeyboardButton.WithCallbackData("✅ Да", "deletetask_yes"),
+                            InlineKeyboardButton.WithCallbackData("❌ Нет", "deletetask_no")
+                        });
 
                         await bot.SendMessage(chatId,
                             $"Удалить задачу \"{taskName}\"?",
@@ -142,13 +142,18 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
 
                         if (cbData == "deletetask_yes")
                         {
-                            if (context.Data.TryGetValue("SelectedTaskId", out var tidObj) && tidObj is Guid taskId)
+                            if (!context.Data.TryGetValue("SelectedTaskId", out var tidObj) || tidObj is not Guid taskId)
                             {
-                                await _todoService.DeleteAsync(taskId, ct);
-                                string taskName = context.Data.TryGetValue("SelectedTaskName", out var n) && n is string name
-                                    ? name : "Задача";
-                                await bot.SendMessage(chatId, $"✅ \"{taskName}\" удалена.", cancellationToken: ct);
+                                await bot.SendMessage(chatId, "❌ Ошибка: задача не найдена в контексте. Начните заново.", cancellationToken: ct);
+                                context.CurrentStep = null;
+                                context.Data.Clear();
+                                return ScenarioResult.Completed;
                             }
+
+                            await _todoService.DeleteAsync(taskId, ct);
+                            string taskName = context.Data.TryGetValue("SelectedTaskName", out var n) && n is string name
+                                ? name : "Задача";
+                            await bot.SendMessage(chatId, $"✅ \"{taskName}\" удалена.", cancellationToken: ct);
                         }
                         else
                         {
