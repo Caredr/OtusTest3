@@ -32,18 +32,34 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
         ScenarioContext context, Update update, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
-            var user = context.Context!;
-            var inputText = update.Message?.Text?.Trim();
+
+            // Извлекаем chatId и telegramUserId из любого типа апдейта
+            long chatId = update.CallbackQuery?.Message?.Chat.Id
+                       ?? update.Message?.Chat.Id
+                       ?? 0;
+            long telegramUserId = update.CallbackQuery?.From.Id
+                               ?? update.Message?.From?.Id
+                               ?? 0;
+
             switch (context.CurrentStep)
             {
                 case null:
-                    var todoUser = await _userService.GetUserAsync(update.Message.From.Id, ct);
+                {
+                    // Берём пользователя из контекста если есть, иначе читаем из сервиса
+                    var todoUser = context.Context
+                        ?? await _userService.GetUserAsync(telegramUserId, ct);
+                    if (todoUser == null)
+                        return ScenarioResult.Completed;
                     context.Context = todoUser;
-                    // Отправляем сообщение
-                    await bot.SendMessage(update.Message.Chat.Id, "Выберите список для удаления:",
-                        cancellationToken: ct);
+
                     var lists = await _todoListService.GetUserListsAsync(todoUser.UserId, ct);
-                    var buttons = new List<InlineKeyboardButton>();
+                    if (lists.Count == 0)
+                    {
+                        await bot.SendMessage(chatId, "У вас нет списков для удаления.", cancellationToken: ct);
+                        return ScenarioResult.Completed;
+                    }
+
+                    var buttons = new List<InlineKeyboardButton[]>();
                     foreach (var list in lists)
                     {
                         var dto = new ToDoListCallbackDto
@@ -51,72 +67,67 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                             Action = "deletelist",
                             ToDoListId = list.Id
                         };
-
-                        var callbackData = ToDoListCallbackDto.ToString(dto);
-                        buttons.Add(InlineKeyboardButton.WithCallbackData(list.Name, callbackData));
+                        var cb = ToDoListCallbackDto.ToString(dto);
+                        if (cb.Length > 64) cb = cb[..64];
+                        buttons.Add(new[] { InlineKeyboardButton.WithCallbackData(list.Name ?? "(без имени)", cb) });
                     }
-                    var markup = new InlineKeyboardMarkup(buttons.ToArray());
-                    await bot.SendMessage(update.Message.Chat.Id, "Выберете список для удаления:",
+
+                    var markup = new InlineKeyboardMarkup(buttons);
+                    await bot.SendMessage(chatId, "Выберите список для удаления:",
                         replyMarkup: markup,
                         cancellationToken: ct);
+
                     context.CurrentStep = "Approve";
                     return ScenarioResult.Transition;
+                }
 
-                    case "Approve":
+                case "Approve":
+                {
+                    if (!context.Data.TryGetValue("SelectedList", out var obj) || obj is not ToDoList todoList)
+                        return ScenarioResult.Transition; // ждём выбора списка
+
+                    var keyboard = new InlineKeyboardMarkup(new[]
                     {
-                        // Ожидаем, что в Data лежит выбранный ToDoList (его мы сохраняем при обработке CallbackQuery)
-                        if (!context.Data.TryGetValue("SelectedList", out var obj) || obj is not ToDoList todoList)
-                            return ScenarioResult.Completed;
-                        todoUser = context.Context;
-                        if (todoUser == null)
-                            return ScenarioResult.Completed;
-                        // Отправляем сообщение с подтверждением
-                        var keyboard = new InlineKeyboardMarkup(new[]
-                        {
-                            InlineKeyboardButton.WithCallbackData("✅Да", "yes"),
-                            InlineKeyboardButton.WithCallbackData("❌Нет", "no")
-                        });
+                        InlineKeyboardButton.WithCallbackData("✅ Да", "yes"),
+                        InlineKeyboardButton.WithCallbackData("❌ Нет", "no")
+                    });
 
-                        await bot.SendMessage(update.Message.Chat.Id,
-                            $"Подтверждаете удаление списка {todoList.Name} и всех его задач?",
-                            replyMarkup: keyboard,
-                            cancellationToken: ct);
+                    await bot.SendMessage(chatId,
+                        $"Подтверждаете удаление списка \"{todoList.Name}\" и всех его задач?",
+                        replyMarkup: keyboard,
+                        cancellationToken: ct);
 
-                        context.CurrentStep = "Delete";
-                        return ScenarioResult.Transition;
-                    }
+                    context.CurrentStep = "Delete";
+                    return ScenarioResult.Transition;
+                }
 
                 case "Delete":
-                    {
-                        if (update.CallbackQuery is not { Data: var data })
-                            return ScenarioResult.Completed;
-                        todoUser = context.Context;
-                        if (!context.Data.TryGetValue("SelectedList", out var obj) || obj is not ToDoList todoList)
-                            return ScenarioResult.Completed;
-                        if (todoUser == null)
-                            return ScenarioResult.Completed;
-                        if (data == "yes")
-                        {
-                            // Удалить список по его Id
-                            await _todoListService.DeleteAsync(todoList.Id, ct);
-                            await bot.SendMessage(update.Message.Chat.Id,
-                                "Список и все его задачи удалены.",
-                                cancellationToken: ct);
-                        }
-                        else if (data == "no")
-                        {
-                            await bot.SendMessage(update.Message.Chat.Id,
-                                "Удаление отменено.",
-                                cancellationToken: ct);
-                        }
-                        // Очистим выбранный список
-                        context.Data.Remove("SelectedList");
-                        context.CurrentStep = null;
+                {
+                    var data = update.CallbackQuery?.Data;
+                    if (data == null)
+                        return ScenarioResult.Transition;
+
+                    if (!context.Data.TryGetValue("SelectedList", out var obj) || obj is not ToDoList todoList)
                         return ScenarioResult.Completed;
+
+                    if (data == "yes")
+                    {
+                        await _todoListService.DeleteAsync(todoList.Id, ct);
+                        await bot.SendMessage(chatId, "✅ Список удалён.", cancellationToken: ct);
                     }
-                       default:
-                context.CurrentStep = null;
-                return ScenarioResult.Completed;
+                    else
+                    {
+                        await bot.SendMessage(chatId, "Удаление отменено.", cancellationToken: ct);
+                    }
+
+                    context.Data.Remove("SelectedList");
+                    context.CurrentStep = null;
+                    return ScenarioResult.Completed;
+                }
+
+                default:
+                    context.CurrentStep = null;
+                    return ScenarioResult.Completed;
             }
         }
 
