@@ -1,14 +1,15 @@
 using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
-using OtusTest3.Core.Services;
+using OtusTest3.Core.TelegramBot.Dto;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace OtusTest3.Core.TelegramBot.Scenaries
 {
     /// <summary>
-    /// Сценарий просмотра задач выбранного списка (или "Без списка").
-    /// Запускается через callback кнопки show|{listId} из /show.
+    /// Показывает задачи выбранного списка.
+    /// Каждая задача — отдельное сообщение с кнопками "Выполнить" и "Удалить".
     /// </summary>
     internal class ShowTasksScenario : IScenario
     {
@@ -47,7 +48,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                 return ScenarioResult.Completed;
             }
 
-            // Загружаем пользователя если нет в контексте
+            // Загружаем пользователя
             if (context.Context is not ToDoUser user)
             {
                 user = await _userService.GetUserAsync(telegramUserId, ct)
@@ -62,41 +63,43 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                 listId = lid;
 
             string listName = context.Data.TryGetValue("SelectedListName", out var nameObj) && nameObj is string n
-                ? n
-                : "Без списка";
+                ? n : "Без списка";
 
             // Загружаем задачи
             var tasks = await _todoService.GetByUserIdAndList(user.UserId, listId, ct);
 
-            string message;
-
             if (tasks.Count == 0)
             {
-                message = $"Список: {listName}\n\nЗадач пока нет.";
+                await bot.SendMessage(chatId, $"Список: {listName}\n\nЗадач пока нет.", cancellationToken: ct);
+                return ScenarioResult.Completed;
             }
-            else
+
+            // Заголовок
+            await bot.SendMessage(chatId, $"Список: {listName} ({tasks.Count} задач(и)):", cancellationToken: ct);
+
+            // Каждая задача — отдельное сообщение с двумя кнопками
+            foreach (var task in tasks)
             {
-                var sb = new System.Text.StringBuilder();
-                sb.AppendLine($"Список: {listName} ({tasks.Count} задач(и))");
-                sb.AppendLine();
+                string state = task.State == ToDoItemState.Active ? "[ ]" : "[x]";
+                string deadline = task.DeadLine.HasValue
+                    ? $"\nДедлайн: {task.DeadLine.Value:dd.MM.yyyy}"
+                    : string.Empty;
 
-                int idx = 1;
-                foreach (var task in tasks)
+                string text = $"{state} {task.Name}{deadline}";
+
+                // callbackData для кнопок
+                var showDto = new ToDoItemCallbackDto { Action = "showtask", ToDoItemId = task.Id };
+
+                var keyboard = new InlineKeyboardMarkup(new[]
                 {
-                    string state = task.State == ToDoItemState.Active ? "[ ]" : "[x]";
+                    InlineKeyboardButton.WithCallbackData("✅ Выполнить",
+                        new ToDoItemCallbackDto { Action = "completetask", ToDoItemId = task.Id }.ToString()),
+                    InlineKeyboardButton.WithCallbackData("❌ Удалить",
+                        new ToDoItemCallbackDto { Action = "deletetask", ToDoItemId = task.Id }.ToString())
+                });
 
-                    string deadline = task.DeadLine.HasValue
-                        ? $"  до {task.DeadLine.Value:dd.MM.yyyy}"
-                        : string.Empty;
-
-                    sb.AppendLine($"{idx}. {state} {task.Name}{deadline}");
-                    idx++;
-                }
-
-                message = sb.ToString();
+                await bot.SendMessage(chatId, text, replyMarkup: keyboard, cancellationToken: ct);
             }
-
-            await bot.SendMessage(chatId, message, cancellationToken: ct);
 
             return ScenarioResult.Completed;
         }
