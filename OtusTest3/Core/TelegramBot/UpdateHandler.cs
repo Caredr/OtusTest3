@@ -473,7 +473,7 @@ namespace OtusTest3.Core.TelegramBot
                 {
                     await _iToDoService.MarkCompletedAsync(dto.ToDoItemId, ct);
                     await botClient.SendMessage(callbackQuery.Message!.Chat.Id,
-                        $"✅ Задача "{item.Name}" выполнена.", cancellationToken: ct);
+                        $"✅ Задача \"{item.Name}\" выполнена.", cancellationToken: ct);
                 }
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
@@ -488,7 +488,7 @@ namespace OtusTest3.Core.TelegramBot
                 {
                     await _iToDoService.DeleteAsync(dto.ToDoItemId, ct);
                     await botClient.SendMessage(callbackQuery.Message!.Chat.Id,
-                        $"🗑 Задача "{item.Name}" удалена.", cancellationToken: ct);
+                        $"🗑 Задача \"{item.Name}\" удалена.", cancellationToken: ct);
                 }
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
