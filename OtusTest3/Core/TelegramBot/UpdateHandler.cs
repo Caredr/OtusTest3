@@ -435,7 +435,66 @@ namespace OtusTest3.Core.TelegramBot
                 return;
             }
 
-            // 5) Просмотр задач выбранного списка (show|{listId})
+            // 5) showtask — показать информацию о задаче с кнопками
+            if (callbackData.StartsWith("showtask"))
+            {
+                var dto = ToDoItemCallbackDto.FromString(callbackData);
+                var item = await _iToDoService.Get(dto.ToDoItemId, ct);
+                if (item != null)
+                {
+                    string state = item.State == ToDoItemState.Active ? "[ ]" : "[x]";
+                    string deadline = item.DeadLine.HasValue
+                        ? $"
+Дедлайн: {item.DeadLine.Value:dd.MM.yyyy}"
+                        : string.Empty;
+                    string text = $"{state} {item.Name}{deadline}";
+
+                    var keyboard = new InlineKeyboardMarkup(new[]
+                    {
+                        InlineKeyboardButton.WithCallbackData("✅ Выполнить",
+                            new ToDoItemCallbackDto { Action = "completetask", ToDoItemId = item.Id }.ToString()),
+                        InlineKeyboardButton.WithCallbackData("❌ Удалить",
+                            new ToDoItemCallbackDto { Action = "deletetask", ToDoItemId = item.Id }.ToString())
+                    });
+
+                    await botClient.SendMessage(callbackQuery.Message!.Chat.Id, text,
+                        replyMarkup: keyboard, cancellationToken: ct);
+                }
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            // 5b) completetask — отметить задачу выполненной
+            if (callbackData.StartsWith("completetask"))
+            {
+                var dto = ToDoItemCallbackDto.FromString(callbackData);
+                var item = await _iToDoService.Get(dto.ToDoItemId, ct);
+                if (item != null)
+                {
+                    await _iToDoService.MarkCompletedAsync(dto.ToDoItemId, ct);
+                    await botClient.SendMessage(callbackQuery.Message!.Chat.Id,
+                        $"✅ Задача "{item.Name}" выполнена.", cancellationToken: ct);
+                }
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            // 5c) deletetask (из кнопки задачи) — удалить задачу напрямую
+            if (callbackData.StartsWith("deletetask|"))
+            {
+                var dto = ToDoItemCallbackDto.FromString(callbackData);
+                var item = await _iToDoService.Get(dto.ToDoItemId, ct);
+                if (item != null)
+                {
+                    await _iToDoService.DeleteAsync(dto.ToDoItemId, ct);
+                    await botClient.SendMessage(callbackQuery.Message!.Chat.Id,
+                        $"🗑 Задача "{item.Name}" удалена.", cancellationToken: ct);
+                }
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            // 6) Просмотр задач выбранного списка (show|{listId})
             if (callbackData.StartsWith("show"))
             {
                 var toDoUser = await _userService.GetUserAsync(userId, ct)
