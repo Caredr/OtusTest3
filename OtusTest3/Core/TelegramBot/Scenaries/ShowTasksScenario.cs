@@ -1,5 +1,6 @@
 using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
+using OtusTest3.Core.Services;
 using OtusTest3.Core.TelegramBot.Dto;
 using Telegram.Bot;
 using Telegram.Bot.Types;

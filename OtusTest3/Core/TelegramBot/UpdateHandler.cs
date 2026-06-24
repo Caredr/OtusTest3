@@ -106,7 +106,7 @@ namespace OtusTest3.Core.TelegramBot
                         await SendMainKeyboard(botClient, update.Message.Chat.Id, "Главное меню:", ct);
                         break;
                     case "Menu":
-                        await botClient.SendMessage(update.Message.Chat, "Доступные команды /start, "  +
+                        await botClient.SendMessage(update.Message.Chat, "Доступные команды /start, " +
                             " help, / info, / addtask, / showtasks, / removetask,/ completetask,/ showalltasks,/ report,/ find,/ cansel",
                             cancellationToken: ct);
                         break;
@@ -253,277 +253,405 @@ namespace OtusTest3.Core.TelegramBot
                 Console.WriteLine(ex.ToString());
             }
         }
+
+        // Метод обрабатывает все нажатия на инлайн-кнопки от пользователя
         private async Task HandleCallbackQueryAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
+            // Если в апдейте нет CallbackQuery — выходим, обрабатывать нечего
             if (update.CallbackQuery == null)
                 return;
+            // Сохраняем CallbackQuery в переменную для удобного обращения
             var callbackQuery = update.CallbackQuery;
+            // Получаем Telegram ID пользователя, который нажал кнопку
             var userId = callbackQuery.From.Id;
+            // Получаем строку данных кнопки (то, что передаётся в WithCallbackData)
+            // Если данных нет — используем пустую строку чтобы не получить null
             var callbackData = callbackQuery.Data ?? string.Empty;
 
-            // 0) Запуск AddList / DeleteList по инлайн-кнопкам
+            // ─────────────────────────────────────────────
+            // БЛОК 0: Запуск сценариев AddList / DeleteList
+            // Эти кнопки нажимаются когда у пользователя нет активного сценария,
+            // поэтому обрабатываем их первыми — до загрузки контекста
+            // ─────────────────────────────────────────────
             if (callbackData == "addlist")
             {
+                // Ищем пользователя в базе. Если не найден — регистрируем нового
                 var toDoUser = await _userService.GetUserAsync(userId, ct)
                     ?? await _userService.RegisterUser(userId, callbackQuery.From.Username, ct);
+                // Создаём новый контекст сценария AddList
                 var newContext = new ScenarioContext(ScenarioType.AddList);
+                // Сохраняем пользователя в контексте — сценарий будет его использовать
                 newContext.Context = toDoUser;
+                // Сохраняем контекст в репозитории — чтобы следующее сообщение попало в сценарий
                 await _contextRepository.SetContext(userId, newContext, ct);
-                await botClient.SendMessage(callbackQuery.Message!.Chat.Id,
-                    "Введите название нового списка:",
-                    cancellationToken: ct);
+                // Просим пользователя ввести название нового списка
+                await botClient.SendMessage(callbackQuery.Message!.Chat.Id, "Введите название нового списка:", cancellationToken: ct);
+                // Устанавливаем шаг "Name" — следующее сообщение будет обработано как имя 
                 newContext.CurrentStep = "Name";
+                // Сохраняем обновлённый контекст с новым шагом
                 await _contextRepository.SetContext(userId, newContext, ct);
+                // Подтверждаем Telegram что callback обработан (убирает индикатор загрузки на кнопке)
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                // Выходим — дальнейшая обработка не нужна
                 return;
             }
+
+            // Пользователь нажал кнопку "Удалить список"
             if (callbackData == "deletelist")
             {
+                // Ищем пользователя в базе. Если не найден — регистрируем нового
                 var toDoUser = await _userService.GetUserAsync(userId, ct)
                     ?? await _userService.RegisterUser(userId, callbackQuery.From.Username, ct);
+                // Создаём новый контекст сценария DeleteList
                 var newContext = new ScenarioContext(ScenarioType.DeleteList);
+                // Сохраняем пользователя в контексте
                 newContext.Context = toDoUser;
+                // Получаем экземпляр сценария DeleteList из списка всех сценариев
                 await _contextRepository.SetContext(userId, newContext, ct);
+                // Запускаем шаг null — сценарий покажет инлайн-список для выбора
                 var scenario = GetScenario(ScenarioType.DeleteList);
+                // Запускаем шаг null — сценарий покажет инлайн-список для выбора
                 await scenario.HandleMessageAsync(botClient, newContext, update, ct);
+                // Сохраняем контекст после выполнения шага (шаг мог смениться на "Approve")
                 await _contextRepository.SetContext(userId, newContext, ct);
+                // Подтверждаем Telegram что callback обработан
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
-
-            // Получаем контекст пользователя (нужен для сценариев с шагами)
+            // ─────────────────────────────────────────────
+            // Загружаем активный контекст пользователя
+            // Нужен для всех сценариев с несколькими шагами (DeleteList, AddTask, DeleteTask)
+            // 
             var context = await _contextRepository.GetContext(userId, ct);
-
-            // 1) Выбор конкретного списка для DeleteList
-            if (context?.CurrentScenario == ScenarioType.DeleteList &&
-                context.CurrentStep == "Approve" &&
-                callbackData.StartsWith("deletelist"))
+            // ─────────────────────────────────────────────
+            // БЛОК 1: DeleteList — пользователь выбрал конкретный список для удаления
+            // Срабатывает когда активен сценарий DeleteList на шаге "Approve"
+            // и данные кнопки начинаются с "deletelist"
+            // ─────────────────────────────────────────────
+            if (context?.CurrentScenario == ScenarioType.DeleteList && context.CurrentStep == "Approve" && callbackData.StartsWith("deletelist"))
             {
+                // Разбираем данные кнопки — внутри зашит Guid выбранного списка
                 var dto = ToDoListCallbackDto.FromString(callbackData);
+                // Если Guid пустой — данные некорректны, сообщаем об ошибке и выходим
                 if (dto.ToDoListId == Guid.Empty)
                 {
                     await botClient.AnswerCallbackQuery(callbackQuery.Id, "Некорректный список", cancellationToken: ct);
                     return;
                 }
+                // Загружаем список из репозитория по его Guid
                 var todoList = await _iToDoListService.GetAsync(dto.ToDoListId, ct);
+                // Если список не найден (например уже удалён) — сообщаем об ошибке
                 if (todoList == null)
                 {
                     await botClient.AnswerCallbackQuery(callbackQuery.Id, "Список не найден", cancellationToken: ct);
                     return;
                 }
+                // Кладём выбранный список в Data контекста — сценарий прочитает его на следующем шаге
                 context.Data["SelectedList"] = todoList;
+                // Получаем сценарий DeleteList
                 var scenario = GetScenario(ScenarioType.DeleteList);
+                // Вызываем HandleMessageAsync на шаге "Approve" — сценарий отправит кнопки "Да/Нет" и переключит шаг на "Delete"
                 var res = await scenario.HandleMessageAsync(botClient, context, update, ct);
+                // Если сценарий завершился — сбрасываем контекст пользователя
                 if (res == ScenarioResult.Completed)
                     await _contextRepository.ResetContext(userId, ct);
                 else
-                    await _contextRepository.SetContext(userId, context, ct); // сохраняем CurrentStep="Delete"
+                    // Сохраняем контекст с новым шагом "Delete" чтобы следующий callback (Да/Нет) попал в блок 2
+                    await _contextRepository.SetContext(userId, context, ct);
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
-
-            // 2) Подтверждение удаления yes/no
-            if (context?.CurrentScenario == ScenarioType.DeleteList &&
-                context.CurrentStep == "Delete")
+            // ─────────────────────────────────────────────
+            // БЛОК 2: DeleteList — пользователь нажал "Да" или "Нет" в подтверждении удаления
+            // Срабатывает когда активен сценарий DeleteList на шаге "Delete"
+            // ─────────────────────────────────────────────
+            if (context?.CurrentScenario == ScenarioType.DeleteList && context.CurrentStep == "Delete")
             {
+                // Получаем сценарий DeleteList
                 var scenario = GetScenario(ScenarioType.DeleteList);
+                // Вызываем HandleMessageAsync на шаге "Delete" — сценарий читает "yes"/"no"
+                // и удаляет список или отменяет операцию
                 var res = await scenario.HandleMessageAsync(botClient, context, update, ct);
+                // Сбрасываем контекст — сценарий завершён
                 if (res == ScenarioResult.Completed)
                 {
                     await _contextRepository.ResetContext(userId, ct);
+                    // Возвращаем пользователя в главное меню
                     await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
                 }
                 else
+                    // Сценарий ещё не завершён — сохраняем обновлённый контек
                     await _contextRepository.SetContext(userId, context, ct);
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
-
-            // 3) Callback для AddTaskScenario (выбор списка)
-            if (context?.CurrentScenario == ScenarioType.AddTask &&
-                context.CurrentStep == "SelectList" &&
-                callbackData.StartsWith("addtask_list"))
+            // ─────────────────────────────────────────────
+            // БЛОК 3: AddTask — пользователь выбрал список при добавлении задачи
+            // Срабатывает когда активен сценарий AddTask на шаге "SelectList"
+            // ─────────────────────────────────────────────
+            if (context?.CurrentScenario == ScenarioType.AddTask && context.CurrentStep == "SelectList" && callbackData.StartsWith("addtask_list"))
             {
+                // Получаем сценарий AddTask
                 var scenario = GetScenario(ScenarioType.AddTask);
+                // Передаём выбор списка в сценарий — он сохранит Id списка и попросит ввести название задачи
                 var result = await scenario.HandleMessageAsync(botClient, context, update, ct);
+                // Если сценарий завершился — сбрасываем контекст
                 if (result == ScenarioResult.Completed)
                     await _contextRepository.ResetContext(userId, ct);
                 else
+                    // Сохраняем контекст с новым шагом
                     await _contextRepository.SetContext(userId, context, ct);
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
 
-            // 4) DeleteTask: выбор списка
+            // ─────────────────────────────────────────────
+            // БЛОК 4: DeleteTask — пользователь выбрал список (фильтр задач)
+            // ─────────────────────────────────────────────
             if (callbackData.StartsWith("deletetask_list"))
             {
+                // Загружаем контекст заново (context выше мог быть null)
                 var context2 = await _contextRepository.GetContext(userId, ct);
+                // Проверяем что активен именно сценарий DeleteTask
                 if (context2?.CurrentScenario == ScenarioType.DeleteTask)
                 {
+                    // Разбираем данные кнопки — внутри зашит Guid выбранного списка
                     var dto = ToDoListCallbackDto.FromString(callbackData);
+                    // Сохраняем Id списка в Data контекста — сценарий отфильтрует по нему задачи
                     context2.Data["SelectedListId"] = dto.ToDoListId;
+                    // Устанавливаем шаг "SelectList" — сценарий покажет задачи этого списка
                     context2.CurrentStep = "SelectList";
+                    // Сохраняем контекст с новым шагом и данными
                     await _contextRepository.SetContext(userId, context2, ct);
+                    // Получаем сценарий DeleteTask
                     var sc = GetScenario(ScenarioType.DeleteTask);
+                    // Запускаем шаг — сценарий выведет список задач для выбора
                     var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
                     if (res == ScenarioResult.Completed)
                     {
+                        // Сбрасываем контекст и показываем главное меню
                         await _contextRepository.ResetContext(userId, ct);
                         await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
                     }
                     else
+                        // Сохраняем контекст для следующего шага
                         await _contextRepository.SetContext(userId, context2, ct);
                 }
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
 
-            // 4b) DeleteTask: выбор конкретной задачи
+            // ─────────────────────────────────────────────
+            // БЛОК 4b: DeleteTask — пользователь выбрал конкретную задачу для удаления
+            // ───────────────────────────────────────────── 
             if (callbackData.StartsWith("deletetask_item"))
             {
+                // Загружаем контекст пользователя
                 var context2 = await _contextRepository.GetContext(userId, ct);
+                // Проверяем что активен именно сценарий DeleteTask
                 if (context2?.CurrentScenario == ScenarioType.DeleteTask)
                 {
+                    // Разбираем данные кнопки — внутри зашит Guid выбранной задачи
                     var dto = ToDoListCallbackDto.FromString(callbackData);
+                    // Сохраняем Id задачи в Data контекста — шаг "Confirm" прочитает его при удалении
                     context2.Data["SelectedTaskId"] = dto.ToDoListId;
-                    var toDoUser2 = context2.Context as ToDoUser;
+                    // Получаем пользователя из контекста чтобы загрузить его задачи
+                    var toDoUser2 = context2.Context;
                     if (toDoUser2 != null)
                     {
+                        // Загружаем все активные задачи пользователя
                         var allTasks = await _iToDoService.GetAllByUserIdAsync(toDoUser2.UserId, ct);
+                        // Ищем задачу по Id чтобы взять её название для отображения
                         var task = allTasks.FirstOrDefault(t => t.Id == dto.ToDoListId);
+                        // Сохраняем название задачи — покажем его в сообщении подтверждения
                         context2.Data["SelectedTaskName"] = task?.Name ?? "задача";
                     }
+                    // Устанавливаем шаг "SelectTask" — сценарий отправит кнопки "Да/Нет"
                     context2.CurrentStep = "SelectTask";
+                    // Сохраняем контекст
                     await _contextRepository.SetContext(userId, context2, ct);
+                    // Получаем сценарий DeleteTask
                     var sc = GetScenario(ScenarioType.DeleteTask);
+                    // Запускаем шаг — сценарий выведет "Удалить задачу X?" с кнопками Да/Нет
                     var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
                     if (res == ScenarioResult.Completed)
                     {
+                        // Сбрасываем контекст и показываем главное меню
                         await _contextRepository.ResetContext(userId, ct);
                         await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
                     }
                     else
+                        // Сохраняем контекст с шагом "Confirm"
                         await _contextRepository.SetContext(userId, context2, ct);
                 }
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
 
-            // 4c) DeleteTask: подтверждение yes/no
+            // ─────────────────────────────────────────────
+            // БЛОК 4c: DeleteTask — пользователь нажал "Да" или "Нет" при удалении задачи
+            // ─────────────────────────────────────────────
             if (callbackData == "deletetask_yes" || callbackData == "deletetask_no")
             {
+                // Загружаем контекст пользователя
                 var context2 = await _contextRepository.GetContext(userId, ct);
+                // Диагностический лог — выводим в консоль текущий шаг и Id задачи
+                // Помогает отследить потерю контекста если удаление не работает
                 Console.WriteLine($"[4c] CurrentStep={context2?.CurrentStep}, SelectedTaskId={context2?.Data.GetValueOrDefault("SelectedTaskId")}");
+                // Проверяем что активен сценарий DeleteTask И мы находимся на шаге "Confirm"
                 if (context2?.CurrentScenario == ScenarioType.DeleteTask
                     && context2.CurrentStep == "Confirm")
                 {
+                    // Получаем сценарий DeleteTask
                     var sc = GetScenario(ScenarioType.DeleteTask);
+                    // Передаём ответ в сценарий — он удалит задачу (yes) или отменит (no)
                     var res = await sc.HandleMessageAsync(botClient, context2, update, ct);
                     if (res == ScenarioResult.Completed)
                     {
+                        // Сбрасываем контекст — сценарий завершён
                         await _contextRepository.ResetContext(userId, ct);
+                        // Возвращаем пользователя в главное меню
                         await SendMainKeyboard(botClient, callbackQuery.Message!.Chat.Id, "Главное меню:", ct);
                     }
                     else
+                        // Сценарий не завершён — сохраняем обновлённый контекст
                         await _contextRepository.SetContext(userId, context2, ct);
                 }
                 else
                 {
+                    // Контекст не соответствует ожидаемому — логируем для отладки
                     Console.WriteLine($"[4c] Пропущено: сценарий={context2?.CurrentScenario}, шаг={context2?.CurrentStep}");
                 }
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
 
-            // 5) showtask — показать информацию о задаче с кнопками
+            // ─────────────────────────────────────────────
+            // БЛОК 5: Показать детали конкретной задачи с кнопками "Выполнить" и "Удалить"
+            // ─────────────────────────────────────────────
             if (callbackData.StartsWith("showtask"))
             {
+                // Разбираем данные кнопки — внутри зашит Guid задачи
                 var dto = ToDoItemCallbackDto.FromString(callbackData);
+                // Загружаем задачу из сервиса по её Id
                 var item = await _iToDoService.Get(dto.ToDoItemId, ct);
                 if (item != null)
                 {
+                    // Формируем строку статуса: [ ] — активна, [x] — выполнена
                     string state = item.State == ToDoItemState.Active ? "[ ]" : "[x]";
-                    string deadline = item.DeadLine.HasValue
-                        ? $"
-Дедлайн: {item.DeadLine.Value:dd.MM.yyyy}"
-                        : string.Empty;
+                    // Формируем строку дедлайна, если он задан
+                    string deadline = item.DeadLine.HasValue ? $"Дедлайн: {item.DeadLine.Value:dd.MM.yyyy}" : string.Empty;
+                    // Собираем итоговый текст сообщения
                     string text = $"{state} {item.Name}{deadline}";
-
+                    // Создаём инлайн-клавиатуру с двумя кнопками действий над задачей
                     var keyboard = new InlineKeyboardMarkup(new[]
                     {
+                         // Кнопка "Выполнить" — передаёт Id задачи в действие completetask
                         InlineKeyboardButton.WithCallbackData("✅ Выполнить",
                             new ToDoItemCallbackDto { Action = "completetask", ToDoItemId = item.Id }.ToString()),
+                        // Кнопка "Удалить" — передаёт Id задачи в действие deletetask
                         InlineKeyboardButton.WithCallbackData("❌ Удалить",
                             new ToDoItemCallbackDto { Action = "deletetask", ToDoItemId = item.Id }.ToString())
                     });
-
+                    // Отправляем сообщение с информацией о задаче и кнопками
                     await botClient.SendMessage(callbackQuery.Message!.Chat.Id, text,
                         replyMarkup: keyboard, cancellationToken: ct);
                 }
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
 
-            // 5b) completetask — отметить задачу выполненной
+            // ─────────────────────────────────────────────
+            // БЛОК 5b: Отметить задачу как выполненную
+            // ─────────────────────────────────────────────
             if (callbackData.StartsWith("completetask"))
             {
+                // Разбираем данные кнопки — внутри зашит Guid задачи
                 var dto = ToDoItemCallbackDto.FromString(callbackData);
+                // Загружаем задачу чтобы взять её название для сообщения
                 var item = await _iToDoService.Get(dto.ToDoItemId, ct);
                 if (item != null)
                 {
+                    // Помечаем задачу выполненной и сохраняем через репозиторий
                     await _iToDoService.MarkCompletedAsync(dto.ToDoItemId, ct);
+                    // Сообщаем пользователю об успехе
                     await botClient.SendMessage(callbackQuery.Message!.Chat.Id,
                         $"✅ Задача \"{item.Name}\" выполнена.", cancellationToken: ct);
                 }
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
 
-            // 5c) deletetask (из кнопки задачи) — удалить задачу напрямую
+            // ─────────────────────────────────────────────
+            // БЛОК 5c: Удалить задачу напрямую (из кнопки в деталях задачи)
+            // Отличие от DeleteTask сценария: удаление без шагов, сразу по нажатию
+            // ─────────────────────────────────────────────
             if (callbackData.StartsWith("deletetask|"))
             {
+                // Разбираем данные кнопки — внутри зашит Guid задачи
                 var dto = ToDoItemCallbackDto.FromString(callbackData);
+                // Загружаем задачу чтобы взять её название для сообщения
                 var item = await _iToDoService.Get(dto.ToDoItemId, ct);
                 if (item != null)
                 {
+                    // Удаляем задачу через сервис
                     await _iToDoService.DeleteAsync(dto.ToDoItemId, ct);
+                    // Сообщаем пользователю об успехе
                     await botClient.SendMessage(callbackQuery.Message!.Chat.Id,
                         $"🗑 Задача \"{item.Name}\" удалена.", cancellationToken: ct);
                 }
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
-
-            // 6) Просмотр задач выбранного списка (show|{listId})
+            // ─────────────────────────────────────────────
+            // БЛОК 6: Показать задачи выбранного списка
+            // ─────────────────────────────────────────────
             if (callbackData.StartsWith("show"))
             {
+                // Ищем пользователя в базе. Если не найден — регистрируем нового
                 var toDoUser = await _userService.GetUserAsync(userId, ct)
                     ?? await _userService.RegisterUser(userId, callbackQuery.From.Username, ct);
-
+                // Разбираем данные кнопки — внутри может быть Guid списка или Guid.Empty (задачи без списка)
                 var dto = ToDoListCallbackDto.FromString(callbackData);
-
+                // Создаём временный контекст для сценария ShowTasks (не сохраняем — он одношаговый)
                 var showContext = new ScenarioContext(ScenarioType.ShowTasks);
+                // Кладём пользователя в контекст — сценарий загрузит его задачи
                 showContext.Context = toDoUser;
-
                 if (dto.ToDoListId != Guid.Empty)
                 {
+                    // Загружаем список чтобы взять его название для заголовка
                     var list = await _iToDoListService.GetAsync(dto.ToDoListId, ct);
+                    // Кладём Id и название списка в Data контекста
                     showContext.Data["SelectedListId"] = dto.ToDoListId;
                     showContext.Data["SelectedListName"] = list?.Name ?? "(без имени)";
                 }
                 else
                 {
+                    // Guid.Empty означает "задачи без списка"
                     showContext.Data["SelectedListId"] = Guid.Empty;
                     showContext.Data["SelectedListName"] = "Без списка";
                 }
-
+                // Получаем сценарий ShowTasks
                 var showScenario = GetScenario(ScenarioType.ShowTasks);
+                // Запускаем сценарий — он выведет список задач пользователя
                 await showScenario.HandleMessageAsync(botClient, showContext, update, ct);
-
+                // Подтверждаем обработку callback
                 await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
                 return;
             }
-
+            // ─────────────────────────────────────────────
+            // Если ни один блок не обработал callback — просто подтверждаем его
+            // чтобы убрать индикатор загрузки на кнопке у пользователя
+            // ─────────────────────────────────────────────
             await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
         }
 
@@ -606,7 +734,7 @@ namespace OtusTest3.Core.TelegramBot
         public static async Task InfoPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
         {
             await botClient.SendMessage(update.Message.Chat, update.Message.From.Username +
-                " версия программы - 0.0.8, дата создания 18.11.2025, редактура от 08.06.2026");
+                " версия программы - 0.0.8, дата создания 18.11.2025, редактура от 24.06.2026");
         }
 
         public IScenario GetScenario(ScenarioType scenarioType)
