@@ -4,6 +4,7 @@ using OtusTest3.Core.Entities;
 using OtusTest3.Core.Services;
 using OtusTest3.Core.TelegramBot.Dto;
 using OtusTest3.Core.TelegramBot.Scenaries;
+using OtusTest3.Helpers;
 
 using Telegram.Bot;
 using Telegram.Bot.Polling;
@@ -22,6 +23,7 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IScenarioContextRepository _contextRepository;
         private readonly IToDoListService _iToDoListService;
         private readonly int commandDataMaxLenght = 64;
+        private static int _pageSize = 5;
 
         /// <summary>
         /// true  — полный доступ ко всем командам.
@@ -613,39 +615,20 @@ namespace OtusTest3.Core.TelegramBot
                 return;
             }
             // ─────────────────────────────────────────────
-            // БЛОК 6: Показать задачи выбранного списка
+            // БЛОК 6b: Показать ВЫПОЛНЕННЫЕ задачи выбранного списка (с пагинацией)
+            // Проверяем раньше блока "show", т.к. "show_completed" тоже начинается с "show"
+            // ─────────────────────────────────────────────
+            if (callbackData.StartsWith("show_completed"))
+            {
+                await HandleShowCompletedAsync(botClient, callbackQuery, callbackData, ct);
+                return;
+            }
+            // ─────────────────────────────────────────────
+            // БЛОК 6: Показать активные задачи выбранного списка (с пагинацией)
             // ─────────────────────────────────────────────
             if (callbackData.StartsWith("show"))
             {
-                // Ищем пользователя в базе. Если не найден — регистрируем нового
-                var toDoUser = await _userService.GetUserAsync(userId, ct)
-                    ?? await _userService.RegisterUser(userId, callbackQuery.From.Username, ct);
-                // Разбираем данные кнопки — внутри может быть Guid списка или Guid.Empty (задачи без списка)
-                var dto = ToDoListCallbackDto.FromString(callbackData);
-                // Создаём временный контекст для сценария ShowTasks (не сохраняем — он одношаговый)
-                var showContext = new ScenarioContext(ScenarioType.ShowTasks);
-                // Кладём пользователя в контекст — сценарий загрузит его задачи
-                showContext.Context = toDoUser;
-                if (dto.ToDoListId != Guid.Empty)
-                {
-                    // Загружаем список чтобы взять его название для заголовка
-                    var list = await _iToDoListService.GetAsync(dto.ToDoListId, ct);
-                    // Кладём Id и название списка в Data контекста
-                    showContext.Data["SelectedListId"] = dto.ToDoListId;
-                    showContext.Data["SelectedListName"] = list?.Name ?? "(без имени)";
-                }
-                else
-                {
-                    // Guid.Empty означает "задачи без списка"
-                    showContext.Data["SelectedListId"] = Guid.Empty;
-                    showContext.Data["SelectedListName"] = "Без списка";
-                }
-                // Получаем сценарий ShowTasks
-                var showScenario = GetScenario(ScenarioType.ShowTasks);
-                // Запускаем сценарий — он выведет список задач пользователя
-                await showScenario.HandleMessageAsync(botClient, showContext, update, ct);
-                // Подтверждаем обработку callback
-                await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                await HandleShowAsync(botClient, callbackQuery, callbackData, ct);
                 return;
             }
             // ─────────────────────────────────────────────
@@ -698,6 +681,141 @@ namespace OtusTest3.Core.TelegramBot
             return new InlineKeyboardMarkup(rows);
         }
 
+        // Строит постраничную инлайн-клавиатуру: каждая запись — отдельная кнопка,
+        // снизу добавляются стрелки навигации ⬅️/➡️ если страниц больше одной.
+        private InlineKeyboardMarkup BuildPagedButtons(
+            IReadOnlyList<KeyValuePair<string, string>> callbackData,
+            PagedListCallbackDto listDto)
+        {
+            var totalPages = (int)Math.Ceiling((double)callbackData.Count / _pageSize);
+            var page = listDto.Page;
+
+            var pageButtons = callbackData
+                .GetBatchByNumber(_pageSize, page)
+                .Select(kvp => InlineKeyboardButton.WithCallbackData(kvp.Key, kvp.Value))
+                .Select(btn => new[] { btn })
+                .ToList();
+
+            var navButtons = new List<InlineKeyboardButton>();
+            if (page > 0)
+                navButtons.Add(InlineKeyboardButton.WithCallbackData("⬅️",
+                    new PagedListCallbackDto(listDto.Action, listDto.ToDoListId, page - 1).ToString()));
+            if (page < totalPages - 1)
+                navButtons.Add(InlineKeyboardButton.WithCallbackData("➡️",
+                    new PagedListCallbackDto(listDto.Action, listDto.ToDoListId, page + 1).ToString()));
+
+            var rows = new List<IEnumerable<InlineKeyboardButton>>(pageButtons.Cast<IEnumerable<InlineKeyboardButton>>());
+            if (navButtons.Count > 0)
+                rows.Add(navButtons);
+
+            return new InlineKeyboardMarkup(rows);
+        }
+
+        // Метка задачи для кнопки: статус + имя, обрезанная до разумной длины.
+        private static string BuildTaskLabel(ToDoItem task)
+        {
+            string state = task.State == ToDoItemState.Active ? "[ ]" : "[x]";
+            string label = $"{state} {task.Name}";
+            return label.Length > 40 ? label[..40] : label;
+        }
+
+        // Показывает активные задачи списка с пагинацией, редактируя текущее сообщение.
+        private async Task HandleShowAsync(ITelegramBotClient bot, CallbackQuery callbackQuery, string callbackData, CancellationToken ct)
+        {
+            var userId = callbackQuery.From.Id;
+            var toDoUser = await _userService.GetUserAsync(userId, ct)
+                ?? await _userService.RegisterUser(userId, callbackQuery.From.Username, ct);
+
+            var listDto = PagedListCallbackDto.FromString(callbackData);
+            Guid? listId = listDto.ToDoListId == Guid.Empty ? null : listDto.ToDoListId;
+
+            string listName = "Без списка";
+            if (listId.HasValue)
+            {
+                var list = await _iToDoListService.GetAsync(listDto.ToDoListId, ct);
+                listName = list?.Name ?? "(без имени)";
+            }
+
+            var tasks = await _iToDoService.GetByUserIdAndList(toDoUser.UserId, listId, ct);
+            var active = tasks.Where(t => t.State == ToDoItemState.Active).ToList();
+
+            long chatId = callbackQuery.Message!.Chat.Id;
+            int messageId = callbackQuery.Message.MessageId;
+
+            var showCompletedButton = InlineKeyboardButton.WithCallbackData(
+                "☑️Посмотреть выполненные",
+                new PagedListCallbackDto("show_completed", listDto.ToDoListId, 0).ToString());
+
+            if (active.Count == 0)
+            {
+                var emptyMarkup = new InlineKeyboardMarkup(new[] { new[] { showCompletedButton } });
+                await bot.EditMessageText(chatId, messageId, $"Список: {listName}\n\nАктивных задач нет.",
+                    replyMarkup: emptyMarkup, cancellationToken: ct);
+                await bot.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            var pairs = active
+                .Select(t => new KeyValuePair<string, string>(
+                    BuildTaskLabel(t),
+                    new ToDoItemCallbackDto { Action = "showtask", ToDoItemId = t.Id }.ToString()))
+                .ToList();
+
+            var markup = BuildPagedButtons(pairs, listDto);
+            var rows = markup.InlineKeyboard.ToList();
+            rows.Add(new[] { showCompletedButton });
+            markup = new InlineKeyboardMarkup(rows);
+
+            await bot.EditMessageText(chatId, messageId, $"Список: {listName} — активные задачи:",
+                replyMarkup: markup, cancellationToken: ct);
+            await bot.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+        }
+
+        // Показывает выполненные задачи списка с пагинацией, редактируя текущее сообщение.
+        private async Task HandleShowCompletedAsync(ITelegramBotClient bot, CallbackQuery callbackQuery, string callbackData, CancellationToken ct)
+        {
+            var userId = callbackQuery.From.Id;
+            var toDoUser = await _userService.GetUserAsync(userId, ct)
+                ?? await _userService.RegisterUser(userId, callbackQuery.From.Username, ct);
+
+            var listDto = PagedListCallbackDto.FromString(callbackData);
+            Guid? listId = listDto.ToDoListId == Guid.Empty ? null : listDto.ToDoListId;
+
+            var tasks = await _iToDoService.GetByUserIdAndList(toDoUser.UserId, listId, ct);
+            var completed = tasks.Where(t => t.State == ToDoItemState.Completed).ToList();
+
+            long chatId = callbackQuery.Message!.Chat.Id;
+            int messageId = callbackQuery.Message.MessageId;
+
+            var backButton = InlineKeyboardButton.WithCallbackData(
+                "⬅️ К активным",
+                new PagedListCallbackDto("show", listDto.ToDoListId, 0).ToString());
+
+            if (completed.Count == 0)
+            {
+                var emptyMarkup = new InlineKeyboardMarkup(new[] { new[] { backButton } });
+                await bot.EditMessageText(chatId, messageId, "Задач нет",
+                    replyMarkup: emptyMarkup, cancellationToken: ct);
+                await bot.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+                return;
+            }
+
+            var pairs = completed
+                .Select(t => new KeyValuePair<string, string>(
+                    BuildTaskLabel(t),
+                    new ToDoItemCallbackDto { Action = "showtask", ToDoItemId = t.Id }.ToString()))
+                .ToList();
+
+            var markup = BuildPagedButtons(pairs, listDto);
+            var rows = markup.InlineKeyboard.ToList();
+            rows.Add(new[] { backButton });
+            markup = new InlineKeyboardMarkup(rows);
+
+            await bot.EditMessageText(chatId, messageId, "Выполненные задачи:",
+                replyMarkup: markup, cancellationToken: ct);
+            await bot.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: ct);
+        }
+
         public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken ct)
         {
             Console.WriteLine($"[TelegramBot ERROR] Source={source}: {exception}");
@@ -723,7 +841,8 @@ namespace OtusTest3.Core.TelegramBot
                 "\n /help - доска информации" +
                 "\n /info - дата создания программы" +
                 "\n /addtask - добавить задачу" +
-                "\n /show - показать списки (выбери список — увидишь задачи)" +
+                "\n /deletetask - удалить задачу (выбор списка → задачи → подтверждение)" +
+                "\n /show - показать списки (выбери список — активные задачи постранично, можно посмотреть выполненные)" +
                 "\n /report - Статистика по задачам" +
                 "\n /find - Найти по имени" +
                 "\n /removetask - убрать задачу" +
