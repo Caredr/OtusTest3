@@ -561,8 +561,9 @@ namespace OtusTest3.Core.TelegramBot
                         InlineKeyboardButton.WithCallbackData("❌ Удалить",
                             new ToDoItemCallbackDto { Action = "deletetask", ToDoItemId = item.Id }.ToString())
                     });
-                    // Отправляем сообщение с информацией о задаче и кнопками
-                    await botClient.SendMessage(callbackQuery.Message!.Chat.Id, text,
+                    // Переход от списка к задаче пришёл по нажатию inline-кнопки —
+                    // редактируем текущее сообщение, а не отправляем новое
+                    await botClient.EditMessageText(callbackQuery.Message!.Chat.Id, callbackQuery.Message.MessageId, text,
                         replyMarkup: keyboard, cancellationToken: ct);
                 }
                 // Подтверждаем обработку callback
