@@ -57,6 +57,20 @@ namespace OtusTest3
                 };
 
                 botClient.StartReceiving(updateHandler.HandleUpdateAsync, updateHandler.HandleErrorAsync, receiverOptions, token);
+
+                await botClient.SetMyCommands(new[]
+                {
+                    new BotCommand { Command = "start", Description = "Запуск и главное меню" },
+                    new BotCommand { Command = "help", Description = "Справка по командам" },
+                    new BotCommand { Command = "info", Description = "Информация о программе" },
+                    new BotCommand { Command = "addtask", Description = "Добавить задачу" },
+                    new BotCommand { Command = "deletetask", Description = "Удалить задачу" },
+                    new BotCommand { Command = "show", Description = "Списки и задачи (с выполненными)" },
+                    new BotCommand { Command = "report", Description = "Статистика по задачам" },
+                    new BotCommand { Command = "find", Description = "Поиск задач по имени" },
+                    new BotCommand { Command = "cancel", Description = "Отмена текущего ввода" },
+                }, cancellationToken: token);
+
                 var me = await botClient.GetMe();
                 Console.WriteLine($"{me.FirstName} запущен!");
                 Console.WriteLine("Нажмите А чтобы остановиться");
