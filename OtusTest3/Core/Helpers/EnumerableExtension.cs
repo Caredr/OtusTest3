@@ -15,13 +15,10 @@ namespace OtusTest3.Core.Helpers
         {
             if (source is null)
                 throw new ArgumentNullException(nameof(source));
-
             if (batchSize <= 0)
                 throw new ArgumentOutOfRangeException(nameof(batchSize), "Размер пачки должен быть больше 0.");
-
             if (batchNumber < 0)
                 throw new ArgumentOutOfRangeException(nameof(batchNumber), "Номер пачки не может быть меньше 0.");
-
             return source
                 .Skip(batchSize * batchNumber)
                 .Take(batchSize);
