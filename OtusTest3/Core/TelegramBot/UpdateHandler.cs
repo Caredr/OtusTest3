@@ -23,7 +23,7 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IScenarioContextRepository _contextRepository;
         private readonly IToDoListService _iToDoListService;
         private readonly int commandDataMaxLenght = 64;
-        private static int _pageSize = 5;
+        private static readonly int _pageSize = 5;
 
         /// <summary>
         /// true  — полный доступ ко всем командам.
