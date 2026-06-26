@@ -49,7 +49,7 @@ namespace OtusTest3.Core.Services
         }
         public async Task<IReadOnlyList<ToDoItem>> GetActiveByUserIdAsync(Guid userId, CancellationToken ct)
         {
-            return await _iToDoRepository.GetActiveByUserId(userId, ct); 
+            return await _iToDoRepository.GetAllByUserId(userId, ct); 
         }
         public async Task MarkCompletedAsync(Guid id, CancellationToken ct)
         {
@@ -98,14 +98,16 @@ namespace OtusTest3.Core.Services
             return await _iToDoRepository.Get(toDoItemId, ct);
         }
 
-        public async Task<IReadOnlyList<ToDoItem>> GetByUserIdAndList(Guid userId, Guid? listId, CancellationToken ct)
+        public async Task<IReadOnlyList<ToDoItem>> GetByUserIdAndList(Guid userId, Guid? listId, CancellationToken ct, ToDoItemState? stateFilter = null)
         {
-            var allItems = await _iToDoRepository.GetActiveByUserId(userId, ct);
+            var allItems = await _iToDoRepository.GetAllByUserId(userId, ct); // ← берём ВСЕ задачи
             var filtered = allItems.Where(item =>
             {
-                if (listId.HasValue)
-                    return item.List is not null && item.List.Id == listId.Value;
-                return item.List is null;
+                bool listMatch = listId.HasValue
+                    ? item.List is not null && item.List.Id == listId.Value
+                    : item.List is null;
+                bool stateMatch = stateFilter == null || item.State == stateFilter;
+                return listMatch && stateMatch;
             }).ToList();
             return filtered.AsReadOnly();
         }
