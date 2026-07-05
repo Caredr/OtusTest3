@@ -12,7 +12,7 @@ namespace OtusTest3.Core.Entities
     {
         public ToDoUser() // Конструктор - данные по умолчанию, или чтобы не забыть
         {
-                UserId = Guid.NewGuid(); // Генерируем уникальный идентификатор для пользователя
+            UserId = Guid.NewGuid(); // Генерируем уникальный идентификатор для пользователя
             TelegramUserName = "TgShablon"; //  Устанавливаем имя пользователя по умолчанию
             RegisteredAt = DateTime.UtcNow; // Устанавливаем дату регистрации на текущее время
             TelegramUserId = 111; // Устанавливаем идентификатор пользователя в Telegram по умолчанию
