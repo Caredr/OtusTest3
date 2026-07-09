@@ -53,7 +53,8 @@ ALTER TABLE ToDoItem
         ON UPDATE NO ACTION
         ON DELETE NO ACTION;
 
-        -- Индекс для ToDoList.UserId
+
+-- Индекс для ToDoList.UserId
 CREATE INDEX idx_todolist_user_id
     ON ToDoList (UserId);
 
@@ -65,5 +66,5 @@ CREATE INDEX idx_todoitem_user_id
 CREATE INDEX idx_todoitem_list_id
     ON ToDoItem (ListId);
 
-CREATE UNIQUE INDEX idx_todouser_telegram_user_id
+CREATE UNIQUE INDEX ux_todouser_telegram_user_id
     ON ToDoUser (TelegramUserId);
