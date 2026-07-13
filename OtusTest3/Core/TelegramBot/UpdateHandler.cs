@@ -782,7 +782,7 @@ namespace OtusTest3.Core.TelegramBot
             var listDto = PagedListCallbackDto.FromString(callbackData);
             Guid? listId = listDto.ToDoListId == Guid.Empty ? null : listDto.ToDoListId;
 
-            var tasks = await _iToDoService.GetByUserIdAndList(toDoUser.UserId, listId, ct);
+            var tasks = await _iToDoService.GetByUserIdAndList(toDoUser.UserId, listId, ct, ToDoItemState.Completed);
             var completed = tasks.Where(t => t.State == ToDoItemState.Completed).ToList();
 
             long chatId = callbackQuery.Message!.Chat.Id;

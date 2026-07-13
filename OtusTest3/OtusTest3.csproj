@@ -11,4 +11,13 @@
     <ProjectReference Include="..\..\Telegram.Bot-master\src\Telegram.Bot\Telegram.Bot.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="SQL\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="linq2db" Version="6.3.0" />
+    <PackageReference Include="linq2db.PostgreSQL" Version="6.3.0" />
+  </ItemGroup>
+
 </Project>

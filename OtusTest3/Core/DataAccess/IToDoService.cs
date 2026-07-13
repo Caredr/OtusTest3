@@ -23,7 +23,7 @@ namespace OtusTest3.Core.DataAccess
         // Удаляет задачу по id. Если задачи нет, то выбрасывает исключение
         Task DeleteAsync(Guid id, CancellationToken ct);
         // Возвращает все ToDoItem для UserId и ListId (если ListId не null), отсортированные по CreatedAt в порядке убывания.
-        Task<IReadOnlyList<ToDoItem>> GetByUserIdAndList(Guid userId, Guid? listId, CancellationToken ct); 
+        Task<IReadOnlyList<ToDoItem>> GetByUserIdAndList(Guid userId, Guid? listId, CancellationToken ct, ToDoItemState? stateFilter = null); 
         // Получаем информацию о Id пользователя и информацию о листе которым он сейчас пользуется
 
         // Возвращает уникальные ToDoList из задач пользователя (читает из файлов, не из памяти)
