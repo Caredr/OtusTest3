@@ -9,17 +9,6 @@ namespace OtusTest3.Core.Entities
     internal class ToDoItem // это сущность (entity) для отдельной задачи в ToDo-приложении.
                             // Хранит полную информацию об одной задаче пользователя.
     {
-        //Базовая единица данных в системе задач
-        //Может существовать самостоятельно или в составе списка (ToDoList)
-        //Отслеживает жизненный цикл задачи (создание → выполнение → завершение)
-        public ToDoItem( ToDoUser user, string name) //Конструктор - данные по умолчанию, или чтобы не забыть
-        {
-            Name = name;
-            User = user;
-            CreatedAt = DateTime.UtcNow;
-            State = ToDoItemState.Active;
-            Id = Guid.NewGuid();
-        }
         public Guid Id { get; set; } //Уникальный идентификатор задачи
         public ToDoUser User { get; set; } //Владелец задачи
         public string Name { get; set; } //Название/описание задачи
