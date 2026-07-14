@@ -1,5 +1,5 @@
 ﻿using LinqToDB;
-using LinqToDB.Remote;
+using LinqToDB.Async;
 using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
 using System;
@@ -10,16 +10,16 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
 {
     internal class SqlUserRepository : IUserRepository
     {
-        private readonly IDataContextFactory<ToDoDataContext> _factory;
+        private readonly DataContextFactory _factory;
 
-        public SqlUserRepository(IDataContextFactory<ToDoDataContext> factory)
+        public SqlUserRepository(DataContextFactory factory)
         {
             _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         }
 
         public async Task<ToDoUser?> GetUser(Guid userId, CancellationToken ct)
         {
-            using var dbContext = _factory.CreateDataContext();
+            using var dbContext = ((IDataContextFactory<ToDoDataContext>)_factory).CreateDataContext();
 
             var model = await dbContext.ToDoUsers
                 .FirstOrDefaultAsync(u => u.UserId == userId, ct);
@@ -31,7 +31,7 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
 
         public async Task<ToDoUser?> GetUserByTelegramUserId(long telegramUserId, CancellationToken ct)
         {
-            using var dbContext = _factory.CreateDataContext();
+            using var dbContext = ((IDataContextFactory<ToDoDataContext>)_factory).CreateDataContext();
 
             var model = await dbContext.ToDoUsers
                 .FirstOrDefaultAsync(u => u.TelegramUserId == telegramUserId, ct);
@@ -46,7 +46,7 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
             if (user == null)
                 throw new ArgumentNullException(nameof(user));
 
-            using var dbContext = _factory.CreateDataContext();
+            using var dbContext = ((IDataContextFactory<ToDoDataContext>)_factory).CreateDataContext();
 
             var model = ModelMapper.MapToModel(user);
 
