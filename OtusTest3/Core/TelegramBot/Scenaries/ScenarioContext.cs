@@ -15,6 +15,7 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
             Data = new Dictionary<string, object>();
             CurrentStep = null;
             Context = null;
+            CreatedAt = DateTime.UtcNow;
         }
         public ScenarioType CurrentScenario {  get; set; }
         public string? CurrentStep { get; set; } // Switch/case по шагам диалога, Определяет, что спрашивать и что ожидать
@@ -22,6 +23,8 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
                                                               // Хранение между шагами (название задачи на шаге 1 → используется на шаге 3), Полиморфизм: разные типы данных
                                                               //  Изоляция: каждый пользователь = свой Dictionary
         public ToDoUser? Context { get; set; } // "Кто ведет диалог?"
+        public DateTime CreatedAt { get; }
+
     }
 }
 

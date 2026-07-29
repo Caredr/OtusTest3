@@ -1,3 +1,4 @@
+using OtusTest3.Core.BackgroundTasks;
 using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Exeptions;
 using OtusTest3.Core.Infrastructure.DataAccess;
@@ -22,10 +23,10 @@ namespace OtusTest3
                 CancellationTokenSource sourceToken = new();
                 CancellationToken token = sourceToken.Token;
 
-                var botClient = new TelegramBotClient("ТВОЙ_BOT_TOKEN");
+                var botClient = new TelegramBotClient("TOKEN");
 
                 string connectionString =
-                    "Host=localhost;Port=5432;Database=ToDoList;Username=postgres;Password=postgres";
+                    "connectionString";
 
                 DataContextFactory factory = new DataContextFactory(connectionString);
 
@@ -63,6 +64,12 @@ namespace OtusTest3
                     DropPendingUpdates = true
                 };
 
+                var backgroundTaskRunner = new BackgroundTaskRunner();
+                backgroundTaskRunner.AddTask(new ResetScenarioBackgroundTask(resetScenarioTimeout: TimeSpan.FromHours(1),
+                scenarioRepository: contextRepo, bot: botClient));
+
+                backgroundTaskRunner.StartTasks(token);
+
                 botClient.StartReceiving(
                     updateHandler.HandleUpdateAsync,
                     updateHandler.HandleErrorAsync,
@@ -88,6 +95,7 @@ namespace OtusTest3
 
                 if (Console.ReadLine() == "A")
                 {
+                    await backgroundTaskRunner.StopTasks(CancellationToken.None);
                     sourceToken.Cancel();
                     Environment.Exit(0);
                 }

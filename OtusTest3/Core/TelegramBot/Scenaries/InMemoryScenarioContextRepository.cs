@@ -29,5 +29,12 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
             _storage.Remove(userId, out var context);
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<KeyValuePair<long, ScenarioContext>>> GetContexts(CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            IReadOnlyList<KeyValuePair<long, ScenarioContext>> result = _storage.ToArray();
+            return Task.FromResult(result);
+        }
     }
 }
