@@ -53,12 +53,34 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
             }
             return null;
         }
-
         public async Task Add(ToDoUser user, CancellationToken ct)
         {
             if (user.UserId == Guid.Empty) 
                 user.UserId = Guid.NewGuid();
             await SaveUserAsync(user, ct);
+        }
+
+        public async Task<IReadOnlyList<ToDoUser>> GetUsers(CancellationToken ct)
+        {
+            var users = new List<ToDoUser>();
+
+            if (!Directory.Exists(_basePath))
+                return users.AsReadOnly();
+
+            var files = Directory.GetFiles(_basePath, "*.json");
+
+            foreach (var file in files)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                await using var stream = File.OpenRead(file);
+                var user = await JsonSerializer.DeserializeAsync<ToDoUser>(stream, _options, ct);
+
+                if (user != null)
+                    users.Add(user);
+            }
+
+            return users.AsReadOnly();
         }
     }
 }

@@ -37,7 +37,7 @@ namespace OtusTest3.Core.Services
             ToDoItem newTask = new(user, name)
             {
                 List = list,
-                DeadLine = deadLine == DateTime.MaxValue ? null : deadLine
+                Deadline = deadLine == DateTime.MaxValue ? null : deadLine
             };
 
             await _iToDoRepository.Add(newTask, ct);

@@ -15,7 +15,7 @@ namespace OtusTest3.Core.Entities
         public DateTime CreatedAt { get; set; } //Время создания (UTC)
         public ToDoItemState State { get; set; } //Состояние
         public DateTime? StateChangedAt { get; set; } //Когда изменилось состояние
-        public DateTime? DeadLine { get; set; } //Срок выполнения (опционально)
+        public DateTime? Deadline { get; set; } //Срок выполнения (опционально)
         public ToDoList? List { get; set; } //Список, к которому принадлежит (опционально)
 
     }

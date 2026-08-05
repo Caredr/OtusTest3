@@ -11,12 +11,10 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
     internal class SqlUserRepository : IUserRepository
     {
         private readonly DataContextFactory _factory;
-
         public SqlUserRepository(DataContextFactory factory)
         {
             _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         }
-
         public async Task<ToDoUser?> GetUser(Guid userId, CancellationToken ct)
         {
             using var dbContext = ((IDataContextFactory<ToDoDataContext>)_factory).CreateDataContext();
@@ -28,7 +26,6 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                 ? null
                 : ModelMapper.MapFromModel(model);
         }
-
         public async Task<ToDoUser?> GetUserByTelegramUserId(long telegramUserId, CancellationToken ct)
         {
             using var dbContext = ((IDataContextFactory<ToDoDataContext>)_factory).CreateDataContext();
@@ -51,6 +48,16 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
             var model = ModelMapper.MapToModel(user);
 
             await dbContext.InsertAsync(model, token: ct);
+        }
+
+        public async Task<IReadOnlyList<ToDoUser>> GetUsers(CancellationToken ct)
+        {
+            using var dbContext = ((IDataContextFactory<ToDoDataContext>)_factory).CreateDataContext();
+            var models = await dbContext.ToDoUsers
+                .ToListAsync(ct);
+            return models
+                .Select(ModelMapper.MapFromModel)
+                .ToList();
         }
     }
 }

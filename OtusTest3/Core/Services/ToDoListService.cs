@@ -17,7 +17,7 @@ namespace OtusTest3.Core.Services
             _todoService = todoService ?? throw new ArgumentNullException(nameof(todoService));
         }
 
-        public async Task<ToDoList> AddAsync(ToDoUser user, string name, CancellationToken ct)
+        public async Task<OtusTest3.Core.Entities.ToDoList> AddAsync(ToDoUser user, string name, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Имя не должно отсутствовать", nameof(name));

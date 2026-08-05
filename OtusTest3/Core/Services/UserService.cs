@@ -16,7 +16,7 @@ namespace OtusTest3.Core.Services
         {
             return await _iUserRepository.GetUserByTelegramUserId(telegramUserId, ct);
         }
-        public Task<ToDoUser> RegisterUser(long telegramUserId, string telegramUserName, CancellationToken ct)
+        public async Task<ToDoUser> RegisterUser(long telegramUserId, string telegramUserName, CancellationToken ct)
         {
             ArgumentNullException.ThrowIfNull(telegramUserName, nameof(telegramUserName));
             var userСurrent = new ToDoUser
@@ -25,7 +25,8 @@ namespace OtusTest3.Core.Services
                 TelegramUserName = telegramUserName
             };
              _iUserRepository.Add(userСurrent, ct);
-            return Task.FromResult(userСurrent);
+            return await Task.FromResult(userСurrent);
         }
+
     }
 }

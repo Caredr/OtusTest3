@@ -82,8 +82,8 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
             foreach (var task in tasks)
             {
                 string state = task.State == ToDoItemState.Active ? "[ ]" : "[x]";
-                string deadline = task.DeadLine.HasValue
-                    ? $"\nДедлайн: {task.DeadLine.Value:dd.MM.yyyy}"
+                string deadline = task.Deadline.HasValue
+                    ? $"\nДедлайн: {task.Deadline.Value:dd.MM.yyyy}"
                     : string.Empty;
 
                 string text = $"{state} {task.Name}{deadline}";

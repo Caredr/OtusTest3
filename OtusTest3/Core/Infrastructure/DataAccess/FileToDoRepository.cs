@@ -199,5 +199,12 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
             var items = await GetAllByUserId(userId, ct);
             return items.Where(predicate).ToList().AsReadOnly();
         }
+        public async Task<IReadOnlyList<ToDoItem>> GetActiveWithDeadline(
+             Guid userId,DateTime from,DateTime to, CancellationToken ct)
+        {
+            var items = await GetActiveByUserId(userId, ct);
+            return items
+                .Where(i => i.Deadline >= from && i.Deadline < to).ToList().AsReadOnly();
+        }
     }
 }
