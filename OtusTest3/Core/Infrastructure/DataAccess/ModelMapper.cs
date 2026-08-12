@@ -46,7 +46,7 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                 CreatedAt = model.CreatedAt,
                 State = (ToDoItemState)model.State,
                 StateChangedAt = model.StateChangedAt,
-                DeadLine = model.DeadLine,
+                Deadline = model.DeadLine,
                 User = MapFromModel(model.User),
                 List = MapFromModel(model.List)
             };
@@ -64,7 +64,7 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                 CreatedAt = entity.CreatedAt,
                 State = entity.State,   // ПОПРАВКА: одно преобразование
                 StateChangedAt = entity.StateChangedAt,
-                DeadLine = entity.DeadLine,
+                DeadLine = entity.Deadline,
                 User = MapToModel(entity.User),
                 List = MapToModel(entity.List)
             };

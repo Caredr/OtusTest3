@@ -29,6 +29,22 @@ CREATE TABLE ToDoItem
     DeadLine         timestamptz NULL
 );
 
+CREATE TABLE Notification
+(
+    Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    UserId UNIQUEIDENTIFIER NOT NULL,
+    Type NVARCHAR(255) NOT NULL,
+    Text NVARCHAR(MAX) NOT NULL,
+    ScheduledAt DATETIME2 NOT NULL,
+    IsNotified BIT NOT NULL,
+    NotifiedAt DATETIME2 NULL,
+
+    CONSTRAINT FK_Notification_User
+        FOREIGN KEY (UserId) REFERENCES [User](Id)
+);
+
+
+
 -- ToDoList.UserId -> ToDoUser.UserId
 ALTER TABLE ToDoList
     ADD CONSTRAINT fk_todolist_user
@@ -68,3 +84,6 @@ CREATE INDEX idx_todoitem_list_id
 
 CREATE UNIQUE INDEX ux_todouser_telegram_user_id
     ON ToDoUser (TelegramUserId);
+
+CREATE INDEX IX_Notification_UserId
+    ON Notification(UserId);

@@ -12,5 +12,6 @@ namespace OtusTest3.Core.TelegramBot.Scenaries
         Task<ScenarioContext?> GetContext(long userId, CancellationToken ct); // Загружает состояние диалога пользователя из БД/файлов/Redis
         Task SetContext(long userId, ScenarioContext context, CancellationToken ct); // Сериализует ScenarioContext → JSON/BSON, Записывает в хранилище по ключу userId,Перезаписывает существующее состояние 
         Task ResetContext(long userId, CancellationToken ct); // Удаляет запись из хранилища
+        Task<IReadOnlyList<KeyValuePair<long, ScenarioContext>>> GetContexts(CancellationToken ct);
     }
 }

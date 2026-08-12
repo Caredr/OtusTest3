@@ -161,5 +161,24 @@ namespace OtusTest3.Core.Infrastructure.DataAccess
                 .Where(predicate)
                 .ToList();
         }
+        public async Task<IReadOnlyList<ToDoItem>> GetActiveWithDeadline(
+        Guid userId,DateTime from,DateTime to,CancellationToken ct)
+        {
+            using var dbContext = ((IDataContextFactory<ToDoDataContext>)_factory).CreateDataContext();
+
+            var models = await dbContext.ToDoItems
+                .LoadWith(i => i.User)
+                .LoadWith(i => i.List)
+                .LoadWith(i => i.List!.User)
+                .Where(i => i.User.UserId == userId
+                            && i.State != ToDoItemState.Completed
+                            && i.DeadLine >= from
+                            && i.DeadLine < to)
+                .ToListAsync(ct);
+
+            return models
+                .Select(ModelMapper.MapFromModel)
+                .ToList();
+        }
     }
 }

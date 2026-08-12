@@ -548,7 +548,7 @@ namespace OtusTest3.Core.TelegramBot
                     // Формируем строку статуса: [ ] — активна, [x] — выполнена
                     string state = item.State == ToDoItemState.Active ? "[ ]" : "[x]";
                     // Формируем строку дедлайна, если он задан
-                    string deadline = item.DeadLine.HasValue ? $"Дедлайн: {item.DeadLine.Value:dd.MM.yyyy}" : string.Empty;
+                    string deadline = item.Deadline.HasValue ? $"Дедлайн: {item.Deadline.Value:dd.MM.yyyy}" : string.Empty;
                     // Собираем итоговый текст сообщения
                     string text = $"{state} {item.Name}{deadline}";
                     // Создаём инлайн-клавиатуру с двумя кнопками действий над задачей

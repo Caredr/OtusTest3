@@ -1,13 +1,17 @@
+using OtusTest3.Core.BackgroundTasks;
 using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Exeptions;
+using OtusTest3.Core.Infrastructure;
 using OtusTest3.Core.Infrastructure.DataAccess;
 using OtusTest3.Core.Services;
 using OtusTest3.Core.TelegramBot;
 using OtusTest3.Core.TelegramBot.Scenaries;
+using OtusTest3.Infrastructure.BackgroundTasks;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using ToDoList.Infrastructure.BackgroundTasks;
 
 namespace OtusTest3
 {
@@ -22,16 +26,17 @@ namespace OtusTest3
                 CancellationTokenSource sourceToken = new();
                 CancellationToken token = sourceToken.Token;
 
-                var botClient = new TelegramBotClient("ТВОЙ_BOT_TOKEN");
+                var botClient = new TelegramBotClient("TOKEN");
 
                 string connectionString =
-                    "Host=localhost;Port=5432;Database=ToDoList;Username=postgres;Password=postgres";
+                    "connectionString";
 
                 DataContextFactory factory = new DataContextFactory(connectionString);
 
                 IUserRepository userRepo = new SqlUserRepository(factory);
                 IToDoRepository toDoRepo = new SqlToDoRepository(factory);
                 IToDoListRepository toDoListRepo = new SqlToDoListRepository(factory);
+                INotificationService notificationService = new NotificationService(factory);
 
                 UserService userService = new UserService(userRepo);
                 ToDoReportService toDoReportService = new ToDoReportService(toDoRepo);
@@ -63,11 +68,29 @@ namespace OtusTest3
                     DropPendingUpdates = true
                 };
 
+                var backgroundTaskRunner = new BackgroundTaskRunner();
+
+                backgroundTaskRunner.AddTask(new ResetScenarioBackgroundTask(resetScenarioTimeout: TimeSpan.FromHours(1),
+                scenarioRepository: contextRepo, bot: botClient));
+
+                backgroundTaskRunner.AddTask(new NotificationBackgroundTask( notificationService: notificationService,
+                    bot: botClient));
+                backgroundTaskRunner.AddTask(new DeadlineBackgroundTask(
+                     notificationService: notificationService,
+                          userRepository: userRepo, 
+                             toDoRepository: toDoRepo));
+                backgroundTaskRunner.StartTasks(token);
+
                 botClient.StartReceiving(
                     updateHandler.HandleUpdateAsync,
                     updateHandler.HandleErrorAsync,
                     receiverOptions,
                     token);
+
+                backgroundTaskRunner.AddTask(new TodayBackgroundTask(
+                    notificationService: notificationService,
+                    userRepository: userRepo,
+                    toDoRepository: toDoRepo));
 
                 await botClient.SetMyCommands(new[]
                 {
@@ -88,6 +111,7 @@ namespace OtusTest3
 
                 if (Console.ReadLine() == "A")
                 {
+                    await backgroundTaskRunner.StopTasks(CancellationToken.None);
                     sourceToken.Cancel();
                     Environment.Exit(0);
                 }

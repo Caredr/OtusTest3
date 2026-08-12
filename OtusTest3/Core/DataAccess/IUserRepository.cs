@@ -1,9 +1,5 @@
 ﻿using OtusTest3.Core.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace OtusTest3.Core.DataAccess
 {
@@ -15,5 +11,7 @@ namespace OtusTest3.Core.DataAccess
         Task<ToDoUser?> GetUserByTelegramUserId(long telegramUserId, CancellationToken ct);
         // Добавляет нового пользователя в систему. Принимает объект ToDoUser, который содержит информацию о пользователе, и сохраняет его в базе данных.
         Task Add(ToDoUser user, CancellationToken ct);
+        // Возвращает всех пользователей
+        Task<IReadOnlyList<ToDoUser?>> GetUsers(CancellationToken ct);
     }
 }

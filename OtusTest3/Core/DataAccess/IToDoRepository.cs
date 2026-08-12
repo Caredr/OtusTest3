@@ -27,5 +27,7 @@ namespace OtusTest3.Core.DataAccess
         Task<int> CountActive(Guid userId, CancellationToken ct);
         //Возвращает все ToDoItem для UserId, которые удовлетворяют условию predicate
         Task<IReadOnlyList<ToDoItem>> Find(Guid userId, Func<ToDoItem, bool> predicate, CancellationToken ct);
+        //Возвращает активные задачи, у которых Deadline >= from && Deadline < to
+        Task<IReadOnlyList<ToDoItem>> GetActiveWithDeadline(Guid userId, DateTime from, DateTime to, CancellationToken ct);
     }
 }
