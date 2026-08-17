@@ -1,12 +1,6 @@
 ﻿using OtusTest3.Core.DataAccess;
 using OtusTest3.Core.Entities;
 using OtusTest3.Core.Exeptions;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OtusTest3.Core.Services
 {
@@ -34,10 +28,17 @@ namespace OtusTest3.Core.Services
                 throw new TaskLengthLimitException(name.Length, TaskLengthLimitMax);
 
             // Создаём задачу с учётом списка и дедлайна
-            ToDoItem newTask = new(user, name)
+            ToDoItem newTask = new()
             {
+                Id = Guid.NewGuid(),
+                User = user,
+                Name = name,
                 List = list,
-                Deadline = deadLine == DateTime.MaxValue ? null : deadLine
+                Deadline = deadLine == DateTime.MaxValue
+        ? null
+        : deadLine,
+                State = ToDoItemState.Active,
+                StateChangedAt = DateTime.UtcNow
             };
 
             await _iToDoRepository.Add(newTask, ct);

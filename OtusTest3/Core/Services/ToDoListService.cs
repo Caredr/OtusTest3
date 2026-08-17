@@ -17,7 +17,7 @@ namespace OtusTest3.Core.Services
             _todoService = todoService ?? throw new ArgumentNullException(nameof(todoService));
         }
 
-        public async Task<OtusTest3.Core.Entities.ToDoList> AddAsync(ToDoUser user, string name, CancellationToken ct)
+        public async Task<ToDoList> AddAsync(ToDoUser user, string name, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Имя не должно отсутствовать", nameof(name));
@@ -29,7 +29,12 @@ namespace OtusTest3.Core.Services
             if (await _listRepository.ExistsByName(user.UserId, name, ct))
                 throw new ArgumentException($"Список с именем '{name}' уже существует.", nameof(name));
 
-            var list = new ToDoList(Guid.NewGuid(), name, user.UserId);
+            var list = new ToDoList
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                UserId = user.UserId
+            };
 
             // Сохраняем в файл — список доступен после перезапуска
             await _listRepository.Add(list, ct);
