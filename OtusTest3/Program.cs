@@ -11,7 +11,7 @@ using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using ToDoList.Infrastructure.BackgroundTasks;
+using OtusTest3.Core.BackgroundTasks;
 
 namespace OtusTest3
 {

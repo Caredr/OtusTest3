@@ -23,7 +23,7 @@ namespace OtusTest3.Core.TelegramBot
         private readonly IScenarioContextRepository _contextRepository;
         private readonly IToDoListService _iToDoListService;
         private readonly int commandDataMaxLenght = 64;
-        private static int _pageSize = 5;
+        private readonly int _pageSize = 5;
 
         /// <summary>
         /// true  — полный доступ ко всем командам.
@@ -138,10 +138,10 @@ namespace OtusTest3.Core.TelegramBot
                             break;
                         }
                     case "/help":
-                        await HelpPanel(botClient, update, ct);
+                        await HelpPanel(botClient, update);
                         break;
                     case "/info":
-                        await InfoPanel(botClient, update, ct);
+                        await InfoPanel(botClient, update);
                         break;
                     case string s when s.StartsWith("/addtask"):
                         {
@@ -833,7 +833,7 @@ namespace OtusTest3.Core.TelegramBot
             await botClient.SendMessage(update.Message.Chat, "Добро пожаловать!");
         }
 
-        public static async Task HelpPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
+        public static async Task HelpPanel(ITelegramBotClient botClient, Update update)
         {
             await botClient.SendMessage(update.Message.Chat, " "
                 + update.Message.From.Username + " чтобы пользоваться программой" +
@@ -851,7 +851,7 @@ namespace OtusTest3.Core.TelegramBot
                 "\n /cancel  - отмена текущего ввода");
         }
 
-        public static async Task InfoPanel(ITelegramBotClient botClient, Update update, CancellationToken ct)
+        public static async Task InfoPanel(ITelegramBotClient botClient, Update update)
         {
             await botClient.SendMessage(update.Message.Chat, update.Message.From.Username +
                 " версия программы - 0.0.8, дата создания 18.11.2025, редактура от 24.06.2026");
